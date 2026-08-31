@@ -1,5 +1,0 @@
-print("My name is krish") 
-print("My name is krish") 
-print("My name is krish") 
-print("My name is krish") 
-print("My name is krish") 
