@@ -13,6 +13,8 @@ import { VerificationModule } from './modules/verification/verification.module';
 import { EmployersModule } from './modules/employers/employers.module';
 import { TraineesModule } from './modules/trainees/trainees.module';
 import { IdentityMatchesModule } from './modules/identity-matches/identity-matches.module';
+import { FollowUpsModule } from './modules/follow-ups/follow-ups.module';
+import { SkillGapsModule } from './modules/skill-gaps/skill-gaps.module';
 import { AuditModule } from './common/audit/audit.module';
 
 @Module({
@@ -26,6 +28,8 @@ import { AuditModule } from './common/audit/audit.module';
     AuthModule,
     TraineesModule,
     IdentityMatchesModule,
+    FollowUpsModule,
+    SkillGapsModule,
     EmploymentModule,
     VerificationModule,
     EmployersModule,
