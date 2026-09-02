@@ -7,3 +7,6 @@ export const mockPending: PendingItem[] = [
   { employment_id: 'emp-4', trainee_name: 'Sneha Patil', job_role: 'Welder', training_job_role: 'Welder', confidence_score: 20, joining_date: '2026-04-20' },
   { employment_id: 'emp-5', trainee_name: 'Vikas Jadhav', job_role: 'CNC Operator', training_job_role: 'CNC Operator', confidence_score: 60, joining_date: '2026-06-10' },
 ];
+
+// For Phase 2 demo: <30s metric — each VerifyCard handles one click; employer dashboard measures elapsed
+export const MOCK_EMPLOYER_ID = 'employer-mock-001';
