@@ -14,6 +14,23 @@ export default function Home() {
       <Link href="/login">
         <Button size="lg">Get Started</Button>
       </Link>
+      <div className="flex flex-wrap justify-center gap-2">
+        <Link href="/register">
+          <Button variant="outline" size="sm">Register</Button>
+        </Link>
+        <Link href="/consent/9f8c3d1e-2b4a-4c7d-9f2e-6a1b3c5d7e9f">
+          <Button variant="outline" size="sm">Consent</Button>
+        </Link>
+        <Link href="/training/9f8c3d1e-2b4a-4c7d-9f2e-6a1b3c5d7e9f">
+          <Button variant="outline" size="sm">Training</Button>
+        </Link>
+        <Link href="/identity/9f8c3d1e-2b4a-4c7d-9f2e-6a1b3c5d7e9f">
+          <Button variant="outline" size="sm">Identity / Merge</Button>
+        </Link>
+        <Link href="/contact/9f8c3d1e-2b4a-4c7d-9f2e-6a1b3c5d7e9f">
+          <Button variant="outline" size="sm">Update Contact</Button>
+        </Link>
+      </div>
     </main>
   );
 }
