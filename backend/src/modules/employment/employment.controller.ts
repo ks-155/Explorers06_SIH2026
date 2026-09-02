@@ -10,6 +10,10 @@ import {
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { Role } from '@prisma/client';
 import { Roles } from '../../auth/decorators/roles.decorator';
+import {
+  CurrentUser,
+  type AuthenticatedUser,
+} from '../../common/decorators/current-user.decorator';
 import { EmploymentService } from './employment.service';
 import { CreateEmploymentDto } from './dto/create-employment.dto';
 
@@ -23,8 +27,11 @@ export class EmploymentController {
   @Roles(Role.trainee, Role.employer, Role.provider, Role.admin)
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Create employment record (self-reported)' })
-  create(@Body() dto: CreateEmploymentDto) {
-    return this.employmentService.create(dto);
+  create(
+    @Body() dto: CreateEmploymentDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.employmentService.create(dto, user);
   }
 
   @Get(':id')

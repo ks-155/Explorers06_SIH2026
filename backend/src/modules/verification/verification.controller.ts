@@ -35,7 +35,7 @@ export class VerificationController {
     @Param('id') id: string,
     @CurrentUser() user: AuthenticatedUser,
   ) {
-    return this.verificationService.triggerVerification(id, user.id);
+    return this.verificationService.triggerVerification(id, user);
   }
 
   @Post(':id/evidence')
@@ -51,7 +51,7 @@ export class VerificationController {
       id,
       dto.evidence_type,
       dto.evidence_data ?? {},
-      user.id,
+      user,
     );
   }
 }

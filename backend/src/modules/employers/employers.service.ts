@@ -6,6 +6,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { AuditService } from '../../common/audit/audit.service';
 import { ConfidenceScoreService } from '../verification/confidence-score.service';
 import { CreateEmployerDto } from './dto/create-employer.dto';
 import { VerifyEmploymentDto } from './dto/verify-employer.dto';
@@ -17,9 +18,13 @@ export class EmployersService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly confidenceScore: ConfidenceScoreService,
+    private readonly audit: AuditService,
   ) {}
 
-  async create(dto: CreateEmployerDto) {
+  async create(
+    dto: CreateEmployerDto,
+    actor?: { id: string; role: string },
+  ) {
     const employer = await this.prisma.employer.create({
       data: {
         name: dto.name,
@@ -34,6 +39,15 @@ export class EmployersService {
     });
 
     this.logger.log(`Employer created: ${employer.id} (${employer.name})`);
+
+    await this.tryAudit({
+      actor: actor as any,
+      action: 'employer.create',
+      entityType: 'employer',
+      entityId: employer.id,
+      newValue: { name: employer.name, udyam_number: employer.udyam_number },
+    });
+
     return employer;
   }
 
@@ -132,6 +146,15 @@ export class EmployersService {
         `Employment ${dto.employment_id} DENIED by employer ${employerUserId}`,
       );
 
+      await this.tryAudit({
+        actor: { id: employerUserId, role: 'employer' },
+        action: 'employment.denied',
+        entityType: 'employment_record',
+        entityId: dto.employment_id,
+        oldValue: { verification_status: employment.verification_status },
+        newValue: { verification_status: 'rejected' },
+      });
+
       return {
         ...updated,
         level: this.confidenceScore.getLevel(Number(updated.confidence_score)),
@@ -182,6 +205,18 @@ export class EmployersService {
       `Employment ${dto.employment_id} CONFIRMED by employer ${employerUserId}, score: ${score.total}`,
     );
 
+    await this.tryAudit({
+      actor: { id: employerUserId, role: 'employer' },
+      action: 'employment.confirmed',
+      entityType: 'employment_record',
+      entityId: dto.employment_id,
+      oldValue: { verification_status: employment.verification_status },
+      newValue: {
+        verification_status: newStatus,
+        confidence_score: score.total,
+      },
+    });
+
     return {
       ...updated,
       level: score.level,
@@ -194,5 +229,22 @@ export class EmployersService {
     if (score >= 50) return 'MEDIUM';
     if (score >= 20) return 'LOW';
     return 'UNVERIFIED';
+  }
+
+  private async tryAudit(entry: {
+    actor?: { id?: string; role?: string } | null;
+    action: string;
+    entityType?: string;
+    entityId?: string;
+    newValue?: unknown;
+    oldValue?: unknown;
+  }) {
+    try {
+      await this.audit.record(entry as any);
+    } catch (err) {
+      this.logger.warn(
+        `Audit write failed for ${entry.action} (${entry.entityId}): ${(err as Error).message}`,
+      );
+    }
   }
 }

@@ -5,8 +5,13 @@ import {
   Logger,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { AuditService } from '../../common/audit/audit.service';
 import { ConfidenceScoreService } from './confidence-score.service';
 import { VerificationStatus } from '@prisma/client';
+import {
+  ExternalVerificationAdapter,
+  ExternalEvidenceType,
+} from '../adapters/external-verification.adapter';
 
 @Injectable()
 export class VerificationService {
@@ -23,9 +28,14 @@ export class VerificationService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly confidenceScore: ConfidenceScoreService,
+    private readonly externalAdapter: ExternalVerificationAdapter,
+    private readonly audit: AuditService,
   ) {}
 
-  async triggerVerification(employmentId: string, actorId: string) {
+  async triggerVerification(
+    employmentId: string,
+    actor?: { id?: string; role?: string },
+  ) {
     const record = await this.prisma.employmentRecord.findUnique({
       where: { id: employmentId },
       include: { evidence: true },
@@ -44,6 +54,7 @@ export class VerificationService {
       );
     }
 
+    const actorId = actor?.id ?? 'system';
     const updated = await this.prisma.employmentRecord.update({
       where: { id: employmentId },
       data: {
@@ -56,6 +67,15 @@ export class VerificationService {
     this.logger.log(
       `Verification triggered for employment ${employmentId} by ${actorId}`,
     );
+
+    await this.tryAudit({
+      actor: actor as any,
+      action: 'employment.verify_triggered',
+      entityType: 'employment_record',
+      entityId: employmentId,
+      oldValue: { verification_status: record.verification_status },
+      newValue: { verification_status: 'pending' },
+    });
 
     const score = this.confidenceScore.calculate(
       true,
@@ -75,7 +95,7 @@ export class VerificationService {
     employmentId: string,
     evidenceType: string,
     evidenceData: any,
-    verifiedBy: string,
+    actor: { id?: string; role?: string } | null,
   ) {
     const record = await this.prisma.employmentRecord.findUnique({
       where: { id: employmentId },
@@ -99,16 +119,44 @@ export class VerificationService {
       );
     }
 
-    const contribution = this.confidenceScore.getEvidenceContribution(
+    const baseContribution = this.confidenceScore.getEvidenceContribution(
       evidenceType as any,
     );
+
+    // Run the corresponding external (mocked) check for EPFO / Udyam.
+    // Only grant the confidence points if the external check passes.
+    let contribution = baseContribution;
+    let evidenceDataToStore = evidenceData ?? {};
+    if (
+      evidenceType === 'epfo_check' ||
+      evidenceType === 'udyam_link'
+    ) {
+      const check = await this.externalAdapter.checkEvidence(
+        evidenceType as ExternalEvidenceType,
+        evidenceData ?? {},
+      );
+
+      if (!check.checked || !check.verified) {
+        throw new BadRequestException(
+          `External check failed for "${evidenceType}": could not verify`,
+        );
+      }
+
+      evidenceDataToStore = {
+        ...(evidenceData ?? {}),
+        external_check: {
+          verified: true,
+          data: check.data ?? {},
+        },
+      };
+    }
 
     const evidence = await this.prisma.verificationEvidence.create({
       data: {
         employment_id: employmentId,
         evidence_type: evidenceType as any,
-        evidence_data: evidenceData ?? {},
-        verified_by: verifiedBy,
+        evidence_data: evidenceDataToStore,
+        verified_by: actor?.id ?? 'system',
         verified_at: new Date(),
         confidence_contribution: contribution,
       },
@@ -143,6 +191,18 @@ export class VerificationService {
       `Evidence added to employment ${employmentId}: ${evidenceType} (+${contribution}), new score: ${score.total}`,
     );
 
+    await this.tryAudit({
+      actor: actor as any,
+      action: 'employment.evidence_added',
+      entityType: 'verification_evidence',
+      entityId: evidence.id,
+      newValue: {
+        evidence_type: evidenceType,
+        confidence_contribution: contribution,
+        employment_id: employmentId,
+      },
+    });
+
     return {
       employment: {
         ...updated,
@@ -151,5 +211,22 @@ export class VerificationService {
       evidence,
       breakdown: score,
     };
+  }
+
+  private async tryAudit(entry: {
+    actor?: { id?: string; role?: string } | null;
+    action: string;
+    entityType?: string;
+    entityId?: string;
+    newValue?: unknown;
+    oldValue?: unknown;
+  }) {
+    try {
+      await this.audit.record(entry as any);
+    } catch (err) {
+      this.logger.warn(
+        `Audit write failed for ${entry.action} (${entry.entityId}): ${(err as Error).message}`,
+      );
+    }
   }
 }

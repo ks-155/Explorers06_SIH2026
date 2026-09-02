@@ -5,15 +5,22 @@ import {
   Logger,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { AuditService } from '../../common/audit/audit.service';
 import { CreateEmploymentDto } from './dto/create-employment.dto';
 
 @Injectable()
 export class EmploymentService {
   private readonly logger = new Logger(EmploymentService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly audit: AuditService,
+  ) {}
 
-  async create(dto: CreateEmploymentDto) {
+  async create(
+    dto: CreateEmploymentDto,
+    actor?: { id: string; role: string },
+  ) {
     const trainee = await this.prisma.trainee.findUnique({
       where: { id: dto.trainee_id },
     });
@@ -61,6 +68,18 @@ export class EmploymentService {
       `Employment record created: ${record.id} (trainee: ${dto.trainee_id}, score: 20)`,
     );
 
+    await this.tryAudit({
+      actor: actor as any,
+      action: 'employment.create',
+      entityType: 'employment_record',
+      entityId: record.id,
+      newValue: {
+        trainee_id: record.trainee_id,
+        employment_type: record.employment_type,
+        job_role: record.job_role,
+      },
+    });
+
     return {
       ...record,
       level: this.getLevel(Number(record.confidence_score)),
@@ -92,5 +111,22 @@ export class EmploymentService {
     if (score >= 50) return 'MEDIUM';
     if (score >= 20) return 'LOW';
     return 'UNVERIFIED';
+  }
+
+  private async tryAudit(entry: {
+    actor?: { id?: string; role?: string } | null;
+    action: string;
+    entityType?: string;
+    entityId?: string;
+    newValue?: unknown;
+    oldValue?: unknown;
+  }) {
+    try {
+      await this.audit.record(entry as any);
+    } catch (err) {
+      this.logger.warn(
+        `Audit write failed for ${entry.action} (${entry.entityId}): ${(err as Error).message}`,
+      );
+    }
   }
 }

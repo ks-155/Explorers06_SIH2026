@@ -28,8 +28,11 @@ export class EmployersController {
   @Roles(Role.employer, Role.admin)
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Register employer' })
-  create(@Body() dto: CreateEmployerDto) {
-    return this.employersService.create(dto);
+  create(
+    @Body() dto: CreateEmployerDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.employersService.create(dto, user);
   }
 
   @Get(':id')
