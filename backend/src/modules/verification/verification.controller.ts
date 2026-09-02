@@ -8,6 +8,8 @@ import {
   HttpStatus,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
+import { Role } from '@prisma/client';
+import { Roles } from '../../auth/decorators/roles.decorator';
 import {
   CurrentUser,
   type AuthenticatedUser,
@@ -26,6 +28,7 @@ export class VerificationController {
   ) {}
 
   @Post(':id/verify')
+  @Roles(Role.trainee, Role.employer, Role.provider, Role.admin)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Trigger verification for employment record' })
   triggerVerification(
@@ -36,6 +39,7 @@ export class VerificationController {
   }
 
   @Post(':id/evidence')
+  @Roles(Role.trainee, Role.provider, Role.admin)
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Add verification evidence to employment record' })
   addEvidence(

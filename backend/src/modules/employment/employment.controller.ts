@@ -8,6 +8,8 @@ import {
   HttpStatus,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
+import { Role } from '@prisma/client';
+import { Roles } from '../../auth/decorators/roles.decorator';
 import { EmploymentService } from './employment.service';
 import { CreateEmploymentDto } from './dto/create-employment.dto';
 
@@ -18,6 +20,7 @@ export class EmploymentController {
   constructor(private readonly employmentService: EmploymentService) {}
 
   @Post()
+  @Roles(Role.trainee, Role.employer, Role.provider, Role.admin)
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Create employment record (self-reported)' })
   create(@Body() dto: CreateEmploymentDto) {
