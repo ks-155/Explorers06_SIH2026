@@ -8,6 +8,9 @@ import { AuthModule } from './auth/auth.module';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 import { RolesGuard } from './auth/guards/roles.guard';
 import { HealthController } from './health/health.controller';
+import { EmploymentModule } from './modules/employment/employment.module';
+import { VerificationModule } from './modules/verification/verification.module';
+import { EmployersModule } from './modules/employers/employers.module';
 
 @Module({
   imports: [
@@ -17,6 +20,9 @@ import { HealthController } from './health/health.controller';
     }),
     PrismaModule,
     AuthModule,
+    EmploymentModule,
+    VerificationModule,
+    EmployersModule,
   ],
   controllers: [AppController, HealthController],
   providers: [
