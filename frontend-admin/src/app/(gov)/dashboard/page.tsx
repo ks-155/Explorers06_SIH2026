@@ -1,61 +1,43 @@
 'use client';
-import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { loadAuth } from '@/lib/auth';
-import { canViewAnalytics } from '@/lib/rbac';
 import { Card, CardHeader, CardContent } from '@/components/ui/card';
+import { KpiCards } from '@/components/government/KpiCards';
+import { mockGovDashboard, mockSkillGaps } from '@/mocks/govMock';
 
-// Phase 1: shell + RBAC guard; Phase 3/5 will wire real GET /analytics/dashboard
+// Layout handles RBAC guard; this page just renders KPIs (mock Phase 3, live Phase 5)
 export default function GovDashboardPage() {
-  const router = useRouter();
-  const [checked, setChecked] = useState(false);
-  const [role, setRole] = useState<string | null>(null);
-
-  useEffect(() => {
-    const a = loadAuth();
-    if (!a) {
-      router.replace('/login');
-      return;
-    }
-    setRole(a.role);
-    if (!canViewAnalytics(a.role)) {
-      router.replace('/login');
-      return;
-    }
-    setChecked(true);
-  }, [router]);
-
-  if (!checked) return <p className="p-8 text-sm text-gray-500">Checking access…</p>;
-
+  const m = mockGovDashboard;
   return (
-    <main className="p-6 max-w-6xl mx-auto space-y-4">
-      <h1 className="text-2xl font-semibold">Government Dashboard</h1>
+    <main className="space-y-4">
+      <h1 className="text-2xl font-semibold">Government Dashboard — Overview</h1>
       <p className="text-sm text-gray-500">
-        Role: <span className="font-mono">{role}</span> · Aggregate analytics only for government/admin (API-CONTRACT.md 8). Employer blocked client + server.
+        Aggregate analytics only for <code>government/admin</code> per <code>API-CONTRACT.md 8</code>. Trainee/employer blocked client+server (403).
       </p>
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-        {[
-          ['Trained', '—'],
-          ['Certified', '—'],
-          ['Verified employed', '—'],
-          ['Unemployed', '—'],
-          ['Unreachable', '—'],
-        ].map(([k, v]) => (
-          <Card key={k}>
-            <CardHeader className="text-xs text-gray-500">{k}</CardHeader>
-            <CardContent className="text-xl font-semibold">{v}</CardContent>
-          </Card>
-        ))}
-      </div>
+      <KpiCards />
       <Card>
-        <CardHeader className="font-medium">Phase 1 — Mock KPIs</CardHeader>
+        <CardHeader className="font-medium">Retention (mock) — Phase 5 → Recharts LineChart 3m/6m/12m/24m</CardHeader>
         <CardContent className="text-sm text-gray-600">
-          Real KPIs arrive Phase 5 via <code>GET /api/v1/analytics/dashboard</code> (government/admin only). Phase 1 shows shell + RBAC guard.
-          <ul className="list-disc ml-5 mt-2">
-            <li>Retention 3m/6m/12m/24m → Recharts LineChart (Phase 5)</li>
-            <li>Provider ranking → sortable table (Phase 5)</li>
-            <li>Skill gaps → cards (Phase 5)</li>
-          </ul>
+          <div className="flex gap-2">
+            {Object.entries(m.retention).map(([k, v]) => (
+              <span key={k} className="px-2 py-1 bg-gray-50 rounded border text-xs">
+                {k}: {v}%
+              </span>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+      <Card>
+        <CardHeader className="font-medium">Wage progression (mock)</CardHeader>
+        <CardContent className="text-sm text-gray-600">Start {m.wage_progression.start.toLocaleString()} → 6m {m.wage_progression.m6.toLocaleString()} → 12m {m.wage_progression.m12.toLocaleString()} (INR)</CardContent>
+      </Card>
+      <Card>
+        <CardHeader className="font-medium">Skill gaps (mock) — Phase 5 → `GET /analytics/skill-gaps`</CardHeader>
+        <CardContent className="space-y-2">
+          {mockSkillGaps.map((g) => (
+            <div key={g.skill} className="border rounded p-2 text-sm">
+              <div className="font-medium">{g.skill} — {g.gap_type}</div>
+              <div className="text-xs text-gray-500">{g.recommendation}</div>
+            </div>
+          ))}
         </CardContent>
       </Card>
     </main>
