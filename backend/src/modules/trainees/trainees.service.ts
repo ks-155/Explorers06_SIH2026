@@ -326,7 +326,11 @@ export class TraineesService {
   }
 
   private normalizePhone(p: string): string {
-    return p.replace(/\D/g, '').replace(/^91|^0/, '');
+    const digits = p.replace(/\D/g, '');
+    // Strip a leading ISD code "91" only when it is followed by 10 more
+    // digits (i.e. it is a genuine country code, not the start of a normal
+    // 10-digit number such as 9102345678). Also strip a leading trunk "0".
+    return digits.replace(/^91(?=\d{10}$)/, '').replace(/^0(?=\d{10}$)/, '');
   }
 
   private normalizeName(n: string | null | undefined): string {

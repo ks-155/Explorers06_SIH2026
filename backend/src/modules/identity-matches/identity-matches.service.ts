@@ -34,11 +34,37 @@ export class IdentityMatchesService {
     const candidate = match.candidate_trainee_id;
 
     await this.prisma.$transaction([
+      // Re-link all owned data on the candidate to the canonical source
+      // BEFORE the candidate is consumed, so no records orphan under a
+      // trainee that is about to be discarded as merged.
+      this.prisma.employmentRecord.updateMany({
+        where: { trainee_id: candidate },
+        data: { trainee_id: source },
+      }),
+      this.prisma.trainingRecord.updateMany({
+        where: { trainee_id: candidate },
+        data: { trainee_id: source },
+      }),
+      this.prisma.followUp.updateMany({
+        where: { trainee_id: candidate },
+        data: { trainee_id: source },
+      }),
+      // Retarget any identity matches that referenced the candidate so the
+      // dedup graph keeps pointing at the surviving canonical trainee.
+      this.prisma.identityMatch.updateMany({
+        where: { source_trainee_id: candidate },
+        data: { source_trainee_id: source },
+      }),
+      this.prisma.identityMatch.updateMany({
+        where: { candidate_trainee_id: candidate },
+        data: { candidate_trainee_id: source },
+      }),
+      // Supersede the pair that triggered this merge.
       this.prisma.identityMatch.updateMany({
         where: {
           OR: [
-            { source_trainee_id: source, candidate_trainee_id: candidate },
-            { source_trainee_id: candidate, candidate_trainee_id: source },
+            { source_trainee_id: source, candidate_trainee_id: source },
+            { source_trainee_id: candidate, candidate_trainee_id: candidate },
           ],
         },
         data: { status: MatchStatus.merged },
