@@ -1,0 +1,372 @@
+// Skilling Outcomes Intelligence System (SOIS) — Prisma Schema
+// PS ID 26135 · Govt of Maharashtra
+// Owned by: Member 5 (Database + API) — Contract Owner
+// Phase 1: db/ph1-schema — foundational schema, all 11 tables
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+// ENUMS
+// ---------------------------------------------------------------------------
+
+enum IdentityStatus {
+  canonical
+  duplicate
+  merged
+}
+
+enum MatchType {
+  hard
+  soft
+}
+
+enum MatchStatus {
+  proposed
+  confirmed
+  rejected
+  merged
+}
+
+enum TrainingStatus {
+  enrolled
+  completed
+  dropped
+}
+
+enum SourceSystem {
+  sidh
+  manual
+  api
+}
+
+enum EmploymentType {
+  full_time
+  part_time
+  contract
+  self_employed
+  apprenticeship
+}
+
+enum VerificationStatus {
+  self_reported
+  pending
+  employer_confirmed
+  evidence_confirmed
+  rejected
+}
+
+enum EvidenceType {
+  employer_confirmation
+  salary_slip
+  bank_statement
+  offer_letter
+  udyam_link
+  epfo_check
+  self_declaration
+}
+
+enum Channel {
+  whatsapp
+  sms
+  phone
+  self_report
+  in_person
+}
+
+enum FollowUpStatus {
+  scheduled
+  sent
+  responded
+  failed
+  cancelled
+}
+
+enum GapType {
+  employer_feedback
+  retention_analysis
+  wage_analysis
+}
+
+enum SnapshotType {
+  district
+  provider
+  course
+  cohort
+}
+
+enum Role {
+  trainee
+  employer
+  provider
+  government
+  admin
+}
+
+// ---------------------------------------------------------------------------
+// MODULE 1 — TRAINEE OUTCOME PROFILE (Unified Identity)
+// ---------------------------------------------------------------------------
+
+model Trainee {
+  id              String         @id @default(uuid()) @db.Uuid
+  aadhaar_hash    String?        @unique @db.VarChar(64) // hashed, consent-only
+  name            String?        @db.VarChar(255)
+  phone           String?        @db.VarChar(15)
+  alternate_phone String?        @db.VarChar(15)
+  email           String?        @db.VarChar(255)
+  district_id     Int?
+  state           String?        @db.VarChar(50)
+  demographic     Json?
+
+  // consent
+  consent_given      Boolean    @default(false)
+  consent_date       DateTime?  @db.Timestamptz(6)
+  consent_version    String?    @db.VarChar(10)
+  preferred_language String     @default("en") @db.VarChar(10)
+  preferred_channel  String     @default("whatsapp") @db.VarChar(20)
+
+  // unified identity
+  unified_identity_id String?          @db.Uuid
+  identity_status     IdentityStatus   @default(canonical)
+  merge_confidence    Decimal?         @db.Decimal(5, 2)
+  matched_at          DateTime?        @db.Timestamptz(6)
+
+  created_at DateTime @default(now()) @db.Timestamptz(6)
+  updated_at DateTime @updatedAt @db.Timestamptz(6)
+
+  training_records   TrainingRecord[]
+  identity_matches   IdentityMatch[]   @relation("SourceTraineeMatches")
+  candidate_matches  IdentityMatch[]   @relation("CandidateMatches")
+  employment_records EmploymentRecord[]
+  follow_ups         FollowUp[]
+
+  @@map("trainees")
+}
+
+model IdentityMatch {
+  id                  String      @id @default(uuid()) @db.Uuid
+  source_trainee_id   String      @db.Uuid
+  candidate_trainee_id String     @db.Uuid
+  match_type          MatchType
+  match_fields        Json?
+  confidence          Decimal?    @db.Decimal(5, 2)
+  status              MatchStatus @default(proposed)
+  decided_by          String?     @db.VarChar(50)
+  decided_at          DateTime?   @db.Timestamptz(6)
+  created_at          DateTime    @default(now()) @db.Timestamptz(6)
+
+  source_trainee    Trainee @relation("SourceTraineeMatches", fields: [source_trainee_id], references: [id], onDelete: Cascade)
+  candidate_trainee Trainee @relation("CandidateMatches", fields: [candidate_trainee_id], references: [id], onDelete: Cascade)
+
+  @@unique([source_trainee_id, candidate_trainee_id, match_type])
+  @@map("identity_matches")
+}
+
+model TrainingRecord {
+  id               String         @id @default(uuid()) @db.Uuid
+  trainee_id       String         @db.Uuid
+  provider_id      String?        @db.Uuid
+  course_id        String?        @db.Uuid
+  sector           String?        @db.VarChar(100)
+  job_role         String?        @db.VarChar(255)
+  nsqf_level       Int?
+  enrollment_date  DateTime?      @db.Date
+  completion_date  DateTime?      @db.Date
+  certification_id String?        @db.VarChar(100)
+  certification_date DateTime?    @db.Date
+  status           TrainingStatus @default(enrolled)
+  source_system    SourceSystem   @default(sidh)
+  source_id        String?        @db.VarChar(100)
+  created_at       DateTime       @default(now()) @db.Timestamptz(6)
+
+  trainee            Trainee            @relation(fields: [trainee_id], references: [id], onDelete: Cascade)
+  employment_records EmploymentRecord[]
+
+  @@map("training_records")
+}
+
+model TrainingProvider {
+  id                 String  @id @default(uuid()) @db.Uuid
+  name               String  @db.VarChar(255)
+  type               String? @db.VarChar(50)
+  district_id        Int?
+  state              String? @db.VarChar(50)
+  registration_number String? @db.VarChar(100)
+  contact_person     String? @db.VarChar(255)
+  contact_phone      String? @db.VarChar(15)
+  contact_email      String? @db.VarChar(255)
+  validated          Boolean @default(false)
+  created_at         DateTime @default(now()) @db.Timestamptz(6)
+
+  @@map("training_providers")
+}
+
+// ---------------------------------------------------------------------------
+// MODULE 3/4 — EMPLOYMENT + EMPLOYERS (core outcome + verification)
+// ---------------------------------------------------------------------------
+
+model Employer {
+  id                 String  @id @default(uuid()) @db.Uuid
+  name               String  @db.VarChar(255)
+  udyam_number       String? @db.VarChar(50)
+  industry           String? @db.VarChar(100)
+  district_id        Int?
+  state              String? @db.VarChar(50)
+  contact_person     String? @db.VarChar(255)
+  contact_phone      String? @db.VarChar(15)
+  contact_email      String? @db.VarChar(255)
+  verified           Boolean @default(false)
+  verification_method String? @db.VarChar(50)
+  created_at         DateTime @default(now()) @db.Timestamptz(6)
+
+  account_user_id    String?        @db.Uuid
+  employment_records EmploymentRecord[]
+
+  @@map("employers")
+}
+
+model EmploymentRecord {
+  id                     String             @id @default(uuid()) @db.Uuid
+  trainee_id             String             @db.Uuid
+  training_id            String?            @db.Uuid
+  employer_id            String?            @db.Uuid
+  job_role               String?            @db.VarChar(255)
+  employment_type        EmploymentType     @default(full_time)
+  joining_date           DateTime?          @db.Date
+  leaving_date           DateTime?          @db.Date
+  current_salary         Decimal?           @db.Decimal(12, 2)
+  salary_currency        String             @default("INR") @db.VarChar(3)
+  salary_verified        Boolean            @default(false)
+  job_relevant_to_training Boolean?
+  verification_status    VerificationStatus @default(self_reported)
+  confidence_score       Decimal?           @db.Decimal(5, 2)
+  verification_date      DateTime?          @db.Timestamptz(6)
+  verified_by            String?            @db.VarChar(100)
+  created_at             DateTime           @default(now()) @db.Timestamptz(6)
+  updated_at             DateTime           @updatedAt @db.Timestamptz(6)
+
+  trainee  Trainee  @relation(fields: [trainee_id], references: [id], onDelete: Cascade)
+  training TrainingRecord? @relation(fields: [training_id], references: [id])
+  employer Employer? @relation(fields: [employer_id], references: [id])
+
+  evidence VerificationEvidence[]
+  follow_ups FollowUp[]
+
+  @@map("employment_records")
+}
+
+model VerificationEvidence {
+  id                      String       @id @default(uuid()) @db.Uuid
+  employment_id           String       @db.Uuid
+  evidence_type           EvidenceType
+  evidence_data           Json?
+  verified_by             String?      @db.VarChar(100)
+  verified_at             DateTime?    @db.Timestamptz(6)
+  confidence_contribution Decimal?     @db.Decimal(5, 2)
+  created_at              DateTime     @default(now()) @db.Timestamptz(6)
+
+  employment EmploymentRecord @relation(fields: [employment_id], references: [id], onDelete: Cascade)
+
+  @@map("verification_evidence")
+}
+
+// ---------------------------------------------------------------------------
+// MODULE 2 — SMART FOLLOW-UP ENGINE
+// ---------------------------------------------------------------------------
+
+model FollowUp {
+  id                   String       @id @default(uuid()) @db.Uuid
+  trainee_id           String       @db.Uuid
+  employment_id        String?      @db.Uuid
+  follow_up_date       DateTime?    @db.Date
+  months_after_training Int?
+  channel              Channel      @default(whatsapp)
+  status               FollowUpStatus @default(scheduled)
+  questions            Json?
+  responses            Json?
+  non_placement_reason String?      @db.Text
+  response_time_seconds Int?
+  created_at           DateTime     @default(now()) @db.Timestamptz(6)
+
+  trainee    Trainee            @relation(fields: [trainee_id], references: [id], onDelete: Cascade)
+  employment EmploymentRecord?  @relation(fields: [employment_id], references: [id])
+
+  @@map("follow_ups")
+}
+
+// ---------------------------------------------------------------------------
+// MODULE 6 — SKILL GAP & RECOMMENDATION
+// ---------------------------------------------------------------------------
+
+model SkillGap {
+  id             String   @id @default(uuid()) @db.Uuid
+  course_id      String?  @db.Uuid
+  sector         String?  @db.VarChar(100)
+  job_role       String?  @db.VarChar(255)
+  skill_name     String?  @db.VarChar(255)
+  gap_type       GapType
+  gap_description String? @db.Text
+  recommendation String?  @db.Text
+  identified_date DateTime? @db.Date
+  source         String?  @db.VarChar(100)
+  created_at     DateTime @default(now()) @db.Timestamptz(6)
+
+  @@map("skill_gaps")
+}
+
+// ---------------------------------------------------------------------------
+// MODULE 5 — OUTCOME ANALYTICS
+// ---------------------------------------------------------------------------
+
+model AnalyticsSnapshot {
+  id           String       @id @default(uuid()) @db.Uuid
+  snapshot_type SnapshotType
+  entity_id    String?      @db.Uuid
+  period_start DateTime?    @db.Date
+  period_end   DateTime?    @db.Date
+  metrics      Json?
+  created_at   DateTime     @default(now()) @db.Timestamptz(6)
+
+  @@map("analytics_snapshots")
+}
+
+// ---------------------------------------------------------------------------
+// AUTH + AUDIT
+// ---------------------------------------------------------------------------
+
+model User {
+  id           String   @id @default(uuid()) @db.Uuid
+  role         Role
+  phone        String?  @db.VarChar(15)
+  email        String?  @db.VarChar(255)
+  password_hash String? @db.VarChar(255)
+  trainee_id   String?  @db.Uuid
+  employer_id  String?  @db.Uuid
+  created_at   DateTime @default(now()) @db.Timestamptz(6)
+  updated_at   DateTime @updatedAt @db.Timestamptz(6)
+
+  @@unique([email])
+  @@unique([phone])
+  @@map("users")
+}
+
+model AuditLog {
+  id          String   @id @default(uuid()) @db.Uuid
+  actor_id    String?  @db.Uuid
+  actor_type  String?  @db.VarChar(50)
+  action      String   @db.VarChar(100)
+  entity_type String?  @db.VarChar(50)
+  entity_id   String?  @db.Uuid
+  old_value   Json?
+  new_value   Json?
+  ip_address  String?  @db.VarChar(45)
+  created_at  DateTime @default(now()) @db.Timestamptz(6)
+
+  @@map("audit_log")
+}

@@ -1,0 +1,59 @@
+version: "3.9"
+
+# SOIS — Local development stack (owned by Arch/M6, schema by Member 5)
+services:
+  postgres:
+    image: postgres:16
+    container_name: sois-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: sois
+      POSTGRES_PASSWORD: sois
+      POSTGRES_DB: sois
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sois -d sois"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: sois-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: sois-backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://sois:sois@postgres:5432/sois?schema=public
+      REDIS_URL: redis://redis:6379
+      PORT: 3001
+      JWT_SECRET: change-me-in-production
+    ports:
+      - "3001:3001"
+    command: npm run start:dev
+
+volumes:
+  postgres_data:
+  redis_data:
