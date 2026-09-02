@@ -30,6 +30,9 @@ export default function Home() {
         <Link href="/contact/9f8c3d1e-2b4a-4c7d-9f2e-6a1b3c5d7e9f">
           <Button variant="outline" size="sm">Update Contact</Button>
         </Link>
+        <Link href="/survey">
+          <Button variant="outline" size="sm">Follow-up Survey</Button>
+        </Link>
       </div>
     </main>
   );
