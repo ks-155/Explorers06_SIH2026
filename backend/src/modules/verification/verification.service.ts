@@ -32,7 +32,9 @@ export class VerificationService {
     });
 
     if (!record) {
-      throw new NotFoundException(`Employment record ${employmentId} not found`);
+      throw new NotFoundException(
+        `Employment record ${employmentId} not found`,
+      );
     }
 
     const allowed = this.validTransitions[record.verification_status] ?? [];
@@ -69,14 +71,21 @@ export class VerificationService {
     };
   }
 
-  async addEvidence(employmentId: string, evidenceType: string, evidenceData: any, verifiedBy: string) {
+  async addEvidence(
+    employmentId: string,
+    evidenceType: string,
+    evidenceData: any,
+    verifiedBy: string,
+  ) {
     const record = await this.prisma.employmentRecord.findUnique({
       where: { id: employmentId },
       include: { evidence: true },
     });
 
     if (!record) {
-      throw new NotFoundException(`Employment record ${employmentId} not found`);
+      throw new NotFoundException(
+        `Employment record ${employmentId} not found`,
+      );
     }
 
     if (record.verification_status === 'rejected') {
@@ -85,10 +94,14 @@ export class VerificationService {
 
     const existingTypes = record.evidence.map((e) => e.evidence_type);
     if (existingTypes.includes(evidenceType as any)) {
-      throw new BadRequestException(`Evidence type "${evidenceType}" already submitted`);
+      throw new BadRequestException(
+        `Evidence type "${evidenceType}" already submitted`,
+      );
     }
 
-    const contribution = this.confidenceScore.getEvidenceContribution(evidenceType as any);
+    const contribution = this.confidenceScore.getEvidenceContribution(
+      evidenceType as any,
+    );
 
     const evidence = await this.prisma.verificationEvidence.create({
       data: {
@@ -101,10 +114,7 @@ export class VerificationService {
       },
     });
 
-    const allEvidenceTypes = [
-      ...existingTypes,
-      evidenceType,
-    ] as any[];
+    const allEvidenceTypes = [...existingTypes, evidenceType] as any[];
 
     const isEmployerConfirmed =
       record.verification_status === 'employer_confirmed' ||

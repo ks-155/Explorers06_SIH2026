@@ -96,7 +96,9 @@ export class EmployersService {
     });
 
     if (!employment) {
-      throw new NotFoundException(`Employment record ${dto.employment_id} not found`);
+      throw new NotFoundException(
+        `Employment record ${dto.employment_id} not found`,
+      );
     }
 
     if (!employment.employer_id) {
@@ -138,7 +140,11 @@ export class EmployersService {
 
     const evidenceTypes = employment.evidence.map((e) => e.evidence_type);
     const isEmployerConfirmed = true;
-    const score = this.confidenceScore.calculate(true, isEmployerConfirmed, evidenceTypes);
+    const score = this.confidenceScore.calculate(
+      true,
+      isEmployerConfirmed,
+      evidenceTypes,
+    );
 
     const newStatus =
       score.total >= 80 ? 'evidence_confirmed' : 'employer_confirmed';
@@ -150,8 +156,10 @@ export class EmployersService {
         confidence_score: score.total,
         verified_by: `employer:${employerUserId}`,
         verification_date: new Date(),
-        job_relevant_to_training: dto.job_relevant ?? employment.job_relevant_to_training,
-        leaving_date: dto.still_employed === false ? new Date() : employment.leaving_date,
+        job_relevant_to_training:
+          dto.job_relevant ?? employment.job_relevant_to_training,
+        leaving_date:
+          dto.still_employed === false ? new Date() : employment.leaving_date,
       },
     });
 

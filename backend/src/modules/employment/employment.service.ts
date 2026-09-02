@@ -26,7 +26,9 @@ export class EmploymentService {
         where: { id: dto.training_id },
       });
       if (!training) {
-        throw new NotFoundException(`Training record ${dto.training_id} not found`);
+        throw new NotFoundException(
+          `Training record ${dto.training_id} not found`,
+        );
       }
     }
 

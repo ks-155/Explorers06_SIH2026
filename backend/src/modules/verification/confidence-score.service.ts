@@ -30,6 +30,9 @@ export class ConfidenceScoreService {
     }
 
     for (const type of evidenceTypes) {
+      if (type === 'employer_confirmation' && isEmployerConfirmed) {
+        continue;
+      }
       const contribution = this.getEvidenceContribution(type);
       if (contribution > 0) {
         score += contribution;

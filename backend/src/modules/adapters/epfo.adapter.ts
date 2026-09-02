@@ -14,7 +14,9 @@ export class EpfoAdapter {
   private readonly logger = new Logger(EpfoAdapter.name);
 
   async check(uan: string, employerName: string): Promise<EpfoCheckResult> {
-    this.logger.log(`[MOCK] EPFO check for UAN: ${uan}, employer: ${employerName}`);
+    this.logger.log(
+      `[MOCK] EPFO check for UAN: ${uan}, employer: ${employerName}`,
+    );
 
     await new Promise((resolve) => setTimeout(resolve, 2000));
 

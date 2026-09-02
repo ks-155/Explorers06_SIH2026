@@ -8,6 +8,10 @@ import {
   HttpStatus,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
+import {
+  CurrentUser,
+  type AuthenticatedUser,
+} from '../../common/decorators/current-user.decorator';
 import { EmployersService } from './employers.service';
 import { CreateEmployerDto } from './dto/create-employer.dto';
 import { VerifyEmploymentDto } from './dto/verify-employer.dto';
@@ -43,11 +47,8 @@ export class EmployersController {
   verifyEmployment(
     @Param('id') _employerId: string,
     @Body() dto: VerifyEmploymentDto,
-    @Body('employer_user_id') employerUserId?: string,
+    @CurrentUser() user: AuthenticatedUser,
   ) {
-    return this.employersService.verifyEmployment(
-      dto,
-      employerUserId ?? _employerId,
-    );
+    return this.employersService.verifyEmployment(dto, user.id);
   }
 }

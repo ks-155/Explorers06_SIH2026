@@ -1,5 +1,17 @@
-import { Controller, Post, Get, Param, Body, HttpCode, HttpStatus } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Get,
+  Param,
+  Body,
+  HttpCode,
+  HttpStatus,
+} from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
+import {
+  CurrentUser,
+  type AuthenticatedUser,
+} from '../../common/decorators/current-user.decorator';
 import { VerificationService } from './verification.service';
 import { ConfidenceScoreService } from './confidence-score.service';
 import { AddEvidenceDto } from './dto/add-evidence.dto';
@@ -18,9 +30,9 @@ export class VerificationController {
   @ApiOperation({ summary: 'Trigger verification for employment record' })
   triggerVerification(
     @Param('id') id: string,
-    @Body() body: { actor_id: string },
+    @CurrentUser() user: AuthenticatedUser,
   ) {
-    return this.verificationService.triggerVerification(id, body.actor_id);
+    return this.verificationService.triggerVerification(id, user.id);
   }
 
   @Post(':id/evidence')
@@ -29,13 +41,13 @@ export class VerificationController {
   addEvidence(
     @Param('id') id: string,
     @Body() dto: AddEvidenceDto,
-    @Body('verified_by') verifiedBy?: string,
+    @CurrentUser() user: AuthenticatedUser,
   ) {
     return this.verificationService.addEvidence(
       id,
       dto.evidence_type,
       dto.evidence_data ?? {},
-      verifiedBy ?? 'system',
+      user.id,
     );
   }
 }

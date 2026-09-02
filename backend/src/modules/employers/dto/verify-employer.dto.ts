@@ -1,5 +1,11 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsNotEmpty, IsString, IsOptional, IsBoolean, IsUUID } from 'class-validator';
+import {
+  IsNotEmpty,
+  IsString,
+  IsOptional,
+  IsBoolean,
+  IsUUID,
+} from 'class-validator';
 
 export class VerifyEmploymentDto {
   @ApiProperty({ description: 'Employment record UUID' })
@@ -7,7 +13,10 @@ export class VerifyEmploymentDto {
   @IsNotEmpty()
   employment_id!: string;
 
-  @ApiProperty({ description: 'Decision: confirm or deny', enum: ['confirm', 'deny'] })
+  @ApiProperty({
+    description: 'Decision: confirm or deny',
+    enum: ['confirm', 'deny'],
+  })
   @IsString()
   @IsNotEmpty()
   decision!: 'confirm' | 'deny';
