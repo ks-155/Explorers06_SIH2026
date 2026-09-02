@@ -11,6 +11,9 @@ import { HealthController } from './health/health.controller';
 import { EmploymentModule } from './modules/employment/employment.module';
 import { VerificationModule } from './modules/verification/verification.module';
 import { EmployersModule } from './modules/employers/employers.module';
+import { TraineesModule } from './modules/trainees/trainees.module';
+import { IdentityMatchesModule } from './modules/identity-matches/identity-matches.module';
+import { AuditModule } from './common/audit/audit.module';
 
 @Module({
   imports: [
@@ -18,8 +21,11 @@ import { EmployersModule } from './modules/employers/employers.module';
       isGlobal: true,
       envFilePath: ['.env'],
     }),
+    AuditModule,
     PrismaModule,
     AuthModule,
+    TraineesModule,
+    IdentityMatchesModule,
     EmploymentModule,
     VerificationModule,
     EmployersModule,
