@@ -116,6 +116,13 @@ export const handlers = [
     );
   }),
 
+  // POST /api/v1/trainees/match (owner/admin) - run dedup match sweep
+  http.post(`${API}/trainees/match`, async () =>
+    HttpResponse.json({
+      data: { matched: mockMergeCandidates, run_at: new Date().toISOString() },
+    })
+  ),
+
   // GET & PUT /api/v1/trainees/:id
   http.get(`${API}/trainees/:id`, () => HttpResponse.json({ data: mockProfile })),
   http.put(`${API}/trainees/:id/consent`, async ({ request }) => {
@@ -140,6 +147,11 @@ export const handlers = [
   // POST /api/v1/identity-matches/:id/confirm (owner/admin)
   http.post(`${API}/identity-matches/:id/confirm`, () =>
     HttpResponse.json({ data: { success: true, message: "Merge confirmed" } })
+  ),
+
+  // POST /api/v1/identity-matches/:id/reject (owner/admin)
+  http.post(`${API}/identity-matches/:id/reject`, () =>
+    HttpResponse.json({ data: { success: true, message: "Merge rejected" } })
   ),
 
   // Follow-ups (trainee, self)

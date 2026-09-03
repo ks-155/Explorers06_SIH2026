@@ -14,6 +14,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { api } from "@/lib/api-client";
+import { WithTrainee } from "@/lib/withTrainee";
 
 export default function ContactPage() {
   const params = useParams<{ id: string }>();
@@ -49,7 +50,8 @@ export default function ContactPage() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gray-50 p-4">
+    <WithTrainee>
+      <div className="flex min-h-screen items-center justify-center bg-gray-50 p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-1">
           <CardTitle className="text-2xl font-bold">Update Contact Details</CardTitle>
@@ -122,6 +124,7 @@ export default function ContactPage() {
           </form>
         </CardContent>
       </Card>
-    </div>
+      </div>
+    </WithTrainee>
   );
 }

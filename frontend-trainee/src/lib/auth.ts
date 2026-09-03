@@ -23,11 +23,13 @@ export function useLogin() {
         role: data.role,
         userId: data.userId,
       });
-      // Trainee lands on dashboard; other roles fall through to role-scoped route.
+      // Trainee lands on their training view; fall back to home if no userId.
       const target =
         data.role === "trainee" && data.userId
-          ? `/dashboard/${data.userId}`
-          : "/";
+          ? `/training/${data.userId}`
+          : data.role === "trainee"
+            ? "/training"
+            : "/";
       router.push(target);
     },
     onError: (err: Error) => setError(err.message),

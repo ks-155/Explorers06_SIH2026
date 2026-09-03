@@ -34,6 +34,8 @@ export default function RegisterPage() {
         name,
         phone,
         district_id: districtId ? Number(districtId) : undefined,
+        consent_given: true,
+        consent_version: "1.0",
         preferred_language: preferredLanguage,
         preferred_channel: preferredChannel,
       };

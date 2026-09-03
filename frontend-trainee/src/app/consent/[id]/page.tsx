@@ -13,8 +13,15 @@ import {
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { api } from "@/lib/api-client";
+import { useQuery } from "@tanstack/react-query";
+import { WithTrainee } from "@/lib/withTrainee";
 
 const CONSENT_VERSION = "1.0";
+
+interface Profile {
+  consent_given?: boolean;
+  consent_version?: string;
+}
 
 export default function ConsentPage() {
   const params = useParams<{ id: string }>();
@@ -23,6 +30,14 @@ export default function ConsentPage() {
   const [consentGiven, setConsentGiven] = useState<boolean | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isPending, setIsPending] = useState(false);
+
+  const profileQuery = useQuery({
+    queryKey: ["profile", id],
+    queryFn: () => api.trainees.get(id as string),
+    enabled: !!id,
+  });
+  const profile = profileQuery.data as Profile | undefined;
+  const currentConsent = profile?.consent_given;
 
   const submit = async (given: boolean) => {
     if (!id) return;
@@ -44,7 +59,8 @@ export default function ConsentPage() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gray-50 p-4">
+    <WithTrainee>
+      <div className="flex min-h-screen items-center justify-center bg-gray-50 p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-1">
           <CardTitle className="text-2xl font-bold">Consent to Share Outcome</CardTitle>
@@ -69,6 +85,17 @@ export default function ConsentPage() {
               Consent version {CONSENT_VERSION}
             </p>
           </div>
+          {!profileQuery.isLoading && currentConsent != null && (
+            <p className="text-sm text-muted-foreground">
+              Current status:{" "}
+              <span className="font-medium">
+                {currentConsent ? "Consented" : "Not consented"}
+              </span>
+              {profile?.consent_version
+                ? ` (version ${profile.consent_version})`
+                : ""}
+            </p>
+          )}
           <div className="flex flex-col gap-2">
             <Label className="text-sm font-medium">Do you consent?</Label>
             <div className="grid grid-cols-2 gap-3">
@@ -92,6 +119,7 @@ export default function ConsentPage() {
           </div>
         </CardContent>
       </Card>
-    </div>
+      </div>
+    </WithTrainee>
   );
 }

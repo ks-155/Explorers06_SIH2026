@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { api } from "@/lib/api-client";
+import { WithTrainee } from "@/lib/withTrainee";
 
 interface MergeCandidate {
   id: string;
@@ -54,10 +55,23 @@ export default function IdentityPage() {
     },
   });
 
+  const rejectMutation = useMutation({
+    mutationFn: (matchId: string) => api.identity.rejectMerge(matchId),
+    onSuccess: (_, matchId) => {
+      setSuccess("Candidate rejected. It will not be linked to you.");
+      queryClient.setQueryData(
+        ["mergeCandidates", id],
+        (old: MergeCandidate[] | undefined) =>
+          (old ?? []).filter((a) => a.id !== matchId)
+      );
+    },
+  });
+
   const candidates = (data ?? []) as MergeCandidate[];
 
   return (
-    <div className="min-h-screen bg-gray-50 p-4">
+    <WithTrainee>
+      <div className="min-h-screen bg-gray-50 p-4">
       <div className="mx-auto max-w-2xl space-y-4">
         <div>
           <h1 className="text-2xl font-bold">Identity &amp; Merge</h1>
@@ -102,13 +116,27 @@ export default function IdentityPage() {
                   Matched on: {c.matched_fields.join(", ")}
                 </p>
               )}
-              <Button
-                size="sm"
-                disabled={confirmMutation.isPending}
-                onClick={() => confirmMutation.mutate(c.id)}
-              >
-                Confirm {c.match_type === "soft" ? "(soft)" : ""} match
-              </Button>
+              <div className="flex gap-2">
+                <Button
+                  size="sm"
+                  disabled={
+                    confirmMutation.isPending || rejectMutation.isPending
+                  }
+                  onClick={() => confirmMutation.mutate(c.id)}
+                >
+                  Confirm {c.match_type === "soft" ? "(soft)" : ""} match
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={
+                    confirmMutation.isPending || rejectMutation.isPending
+                  }
+                  onClick={() => rejectMutation.mutate(c.id)}
+                >
+                  Reject
+                </Button>
+              </div>
             </CardContent>
           </Card>
         ))}
@@ -119,6 +147,7 @@ export default function IdentityPage() {
           </Button>
         </div>
       </div>
-    </div>
+      </div>
+    </WithTrainee>
   );
 }
