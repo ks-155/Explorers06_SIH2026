@@ -227,6 +227,7 @@ model Employer {
 
   account_user_id    String?        @db.Uuid
   employment_records EmploymentRecord[]
+  users              User[]         @relation("UserEmployer")
 
   @@map("employers")
 }
@@ -350,6 +351,8 @@ model User {
   employer_id  String?  @db.Uuid
   created_at   DateTime @default(now()) @db.Timestamptz(6)
   updated_at   DateTime @updatedAt @db.Timestamptz(6)
+
+  employer Employer? @relation("UserEmployer", fields: [employer_id], references: [id], onDelete: SetNull)
 
   @@unique([email])
   @@unique([phone])

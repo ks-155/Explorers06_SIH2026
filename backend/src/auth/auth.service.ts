@@ -1,4 +1,9 @@
-import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
+import {
+  Injectable,
+  InternalServerErrorException,
+  Logger,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
@@ -67,9 +72,18 @@ export class AuthService {
       employerId: payload.employerId,
     };
 
-    const secret =
-      this.config.get<string>('JWT_SECRET') ??
-      'development-only-secret-change-in-production';
+    // Security-critical: never fall back to a hardcoded secret. The app must
+    // fail closed if JWT_SECRET is not supplied, rather than silently issue
+    // tokens signed with a known public value.
+    const secret = this.config.get<string>('JWT_SECRET');
+    if (!secret || secret.length < 32) {
+      this.logger.error(
+        'JWT_SECRET is missing or too short (<32 chars). Refusing to sign tokens.',
+      );
+      throw new InternalServerErrorException(
+        'Authentication is misconfigured (JWT_SECRET). Contact the administrator.',
+      );
+    }
 
     const accessToken = await this.jwtService.signAsync(jwtPayload, {
       secret,

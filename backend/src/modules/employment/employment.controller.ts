@@ -35,7 +35,13 @@ export class EmploymentController {
   }
 
   @Get(':id')
-  @Roles(Role.trainee, Role.provider, Role.employer, Role.admin)
+  @Roles(
+    Role.trainee,
+    Role.provider,
+    Role.employer,
+    Role.admin,
+    Role.government,
+  )
   @ApiOperation({ summary: 'Get employment record with confidence score' })
   findOne(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
     return this.employmentService.findById(id, user);

@@ -68,6 +68,15 @@ export class TraineesController {
     return this.traineesService.getTrainingRecords(id, actor);
   }
 
+  @Get(':id/employment')
+  @ApiOperation({
+    summary:
+      'Get trainee employment records (contract /trainees/:id/employment)',
+  })
+  employment(@Param('id') id: string, @CurrentUser() actor: AuthenticatedUser) {
+    return this.traineesService.getEmploymentRecords(id, actor);
+  }
+
   @Get(':id/merge-candidates')
   @ApiOperation({ summary: 'List probable duplicates (proposed matches)' })
   mergeCandidates(

@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { PrismaModule } from './prisma/prisma.module';
@@ -15,6 +16,7 @@ import { TraineesModule } from './modules/trainees/trainees.module';
 import { IdentityMatchesModule } from './modules/identity-matches/identity-matches.module';
 import { FollowUpsModule } from './modules/follow-ups/follow-ups.module';
 import { SkillGapsModule } from './modules/skill-gaps/skill-gaps.module';
+import { AdaptersModule } from './modules/adapters/adapters.module';
 import { AuditModule } from './common/audit/audit.module';
 
 @Module({
@@ -23,6 +25,13 @@ import { AuditModule } from './common/audit/audit.module';
       isGlobal: true,
       envFilePath: ['.env'],
     }),
+    // M6-03: Rate limiting — 100 req / 60s per IP (ARCHITECTURE.md:164, PHASE-CHECKLIST.md:288)
+    ThrottlerModule.forRoot([
+      {
+        ttl: 60000,
+        limit: 100,
+      },
+    ]),
     AuditModule,
     PrismaModule,
     AuthModule,
@@ -33,10 +42,16 @@ import { AuditModule } from './common/audit/audit.module';
     EmploymentModule,
     VerificationModule,
     EmployersModule,
+    AdaptersModule,
   ],
   controllers: [AppController, HealthController],
   providers: [
     AppService,
+    // M6-03: ThrottlerGuard must be first so rate-limit applies before auth
+    {
+      provide: APP_GUARD,
+      useClass: ThrottlerGuard,
+    },
     {
       provide: APP_GUARD,
       useClass: JwtAuthGuard,
