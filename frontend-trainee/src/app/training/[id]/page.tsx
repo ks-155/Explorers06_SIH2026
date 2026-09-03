@@ -13,6 +13,17 @@ import {
 } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { api } from "@/lib/api-client";
+import { ConfidenceBadge } from "@/components/ConfidenceBadge";
+import { WithTrainee } from "@/lib/withTrainee";
+
+interface Profile {
+  id: string;
+  name?: string;
+  phone?: string;
+  district_id?: number;
+  preferred_language?: string;
+  identity_status?: string;
+}
 
 interface TrainingRecord {
   id: string;
@@ -27,20 +38,46 @@ interface TrainingRecord {
   provider_id?: string;
 }
 
+interface EmploymentRecord {
+  id: string;
+  employer_id?: string;
+  job_role?: string;
+  employment_type?: string;
+  joining_date?: string;
+  verification_status?: string;
+  confidence_score?: number;
+  level?: string;
+}
+
 export default function TrainingPage() {
   const params = useParams<{ id: string }>();
   const id = params?.id;
 
-  const { data, isLoading, error } = useQuery({
+  const profileQuery = useQuery({
+    queryKey: ["profile", id],
+    queryFn: () => api.trainees.get(id as string),
+    enabled: !!id,
+  });
+
+  const trainingQuery = useQuery({
     queryKey: ["training", id],
     queryFn: () => api.trainees.getTraining(id as string),
     enabled: !!id,
   });
 
-  const records = (data ?? []) as TrainingRecord[];
+  const employmentQuery = useQuery({
+    queryKey: ["employment", id],
+    queryFn: () => api.trainees.getEmployment(id as string),
+    enabled: !!id,
+  });
+
+  const profile = profileQuery.data as Profile | undefined;
+  const records = (trainingQuery.data ?? []) as TrainingRecord[];
+  const employment = (employmentQuery.data ?? []) as EmploymentRecord[];
 
   return (
-    <div className="min-h-screen bg-gray-50 p-4">
+    <WithTrainee>
+      <div className="min-h-screen bg-gray-50 p-4">
       <div className="mx-auto max-w-2xl space-y-4">
         <div>
           <h1 className="text-2xl font-bold">My Training</h1>
@@ -49,15 +86,31 @@ export default function TrainingPage() {
           </p>
         </div>
 
-        {error && (
+        {trainingQuery.error && (
           <Alert variant="destructive">
-            <AlertDescription>{(error as Error).message}</AlertDescription>
+            <AlertDescription>{(trainingQuery.error as Error).message}</AlertDescription>
           </Alert>
         )}
 
-        {isLoading && <p className="text-sm text-muted-foreground">Loading…</p>}
+        {/* Profile header (M1-04: fetch GET /trainees/:id) */}
+        {!profileQuery.isLoading && profile && (
+          <Card>
+            <CardHeader>
+              <CardTitle>{profile.name || "Trainee"}</CardTitle>
+              <CardDescription>
+                {profile.phone || "No phone"} · District {profile.district_id ?? "—"}{" "}
+                ·{" "}
+                <span className="capitalize">{profile.identity_status || "—"}</span>
+              </CardDescription>
+            </CardHeader>
+          </Card>
+        )}
 
-        {!isLoading && records.length === 0 && (
+        {trainingQuery.isLoading && (
+          <p className="text-sm text-muted-foreground">Loading…</p>
+        )}
+
+        {!trainingQuery.isLoading && records.length === 0 && (
           <Card>
             <CardContent className="pt-6 text-sm text-muted-foreground">
               No training records found yet.
@@ -99,6 +152,36 @@ export default function TrainingPage() {
           </Card>
         ))}
 
+        {/* Employment + confidence (M1-04 / Phase 4 badge) */}
+        {employment.length > 0 && (
+          <div className="space-y-2">
+            <h2 className="text-lg font-semibold">Employment Status</h2>
+            {employment.map((e) => (
+              <Card key={e.id}>
+                <CardContent className="pt-6 text-sm">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                      <div className="font-medium">{e.job_role || "Current role"}</div>
+                      <div className="text-muted-foreground">
+                        {e.employment_type?.replace("_", " ") || "—"} · joined{" "}
+                        {e.joining_date || "—"}
+                      </div>
+                    </div>
+                    <ConfidenceBadge score={e.confidence_score} />
+                  </div>
+                  <div className="mt-2 text-xs text-muted-foreground">
+                    Verification:{" "}
+                    <span className="capitalize">
+                      {e.verification_status?.replace("_", " ") || "—"}
+                    </span>{" "}
+                    {e.level ? `· ${e.level}` : ""}
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
+
         <div className="flex gap-2">
           <Link href={`/identity/${id}`}>
             <Button variant="outline">Identity / Merge</Button>
@@ -106,8 +189,12 @@ export default function TrainingPage() {
           <Link href={`/contact/${id}`}>
             <Button variant="outline">Update Contact</Button>
           </Link>
+          <Link href="/survey">
+            <Button variant="outline">Follow-up Survey</Button>
+          </Link>
         </div>
       </div>
-    </div>
+      </div>
+    </WithTrainee>
   );
 }

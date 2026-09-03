@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -12,6 +13,8 @@ import {
 } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { api } from "@/lib/api-client";
+import { Locale, locales, t } from "@/lib/i18n";
+import { WithTrainee } from "@/lib/withTrainee";
 
 interface PendingFollowUp {
   id: string;
@@ -22,6 +25,7 @@ interface PendingFollowUp {
 }
 
 export default function SurveyList() {
+  const [locale, setLocale] = useState<Locale>("hi");
   const { data, isLoading, error } = useQuery({
     queryKey: ["pending-followups"],
     queryFn: () => api.followUps.getPending(),
@@ -30,13 +34,27 @@ export default function SurveyList() {
   const items = (data ?? []) as PendingFollowUp[];
 
   return (
-    <div className="min-h-screen bg-gray-50 p-4">
+    <WithTrainee>
+      <div className="min-h-screen bg-gray-50 p-4">
       <div className="mx-auto max-w-2xl space-y-4">
-        <div>
-          <h1 className="text-2xl font-bold">Follow-up Surveys</h1>
-          <p className="text-sm text-muted-foreground">
-            Short questions to track your training outcome. Takes under a minute.
-          </p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold">{t(locale, "pendingTitle")}</h1>
+            <p className="text-sm text-muted-foreground">
+              {t(locale, "pendingSubtitle")}
+            </p>
+          </div>
+          <select
+            className="rounded-md border border-input bg-background px-2 py-1 text-sm"
+            value={locale}
+            onChange={(e) => setLocale(e.target.value as Locale)}
+          >
+            {locales.map((l) => (
+              <option key={l} value={l}>
+                {l.toUpperCase()}
+              </option>
+            ))}
+          </select>
         </div>
 
         {error && (
@@ -50,7 +68,7 @@ export default function SurveyList() {
         {!isLoading && items.length === 0 && (
           <Card>
             <CardContent className="pt-6 text-sm text-muted-foreground">
-              No pending follow-ups right now.
+              {t(locale, "noPending")}
             </CardContent>
           </Card>
         )}
@@ -58,7 +76,7 @@ export default function SurveyList() {
         {items.map((f) => (
           <Card key={f.id}>
             <CardHeader>
-              <CardTitle>Outcome follow-up</CardTitle>
+              <CardTitle>{t(locale, "pendingTitle")}</CardTitle>
               <CardDescription>
                 {f.follow_up_date ? `Due ${f.follow_up_date}` : "Due now"} ·{" "}
                 {f.months_after_training != null
@@ -68,12 +86,13 @@ export default function SurveyList() {
             </CardHeader>
             <CardContent>
               <Link href={`/survey/${f.id}`}>
-                <Button size="sm">Start</Button>
+                <Button size="sm">{t(locale, "start")}</Button>
               </Link>
             </CardContent>
           </Card>
         ))}
       </div>
-    </div>
+      </div>
+    </WithTrainee>
   );
 }

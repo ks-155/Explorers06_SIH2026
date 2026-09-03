@@ -93,6 +93,12 @@ export const api = {
         body: JSON.stringify(payload),
       });
     },
+    runMatch(payload: Record<string, unknown> = {}) {
+      return request("/trainees/match", {
+        method: "POST",
+        body: JSON.stringify(payload),
+      });
+    },
     get(id: string) {
       return request<Record<string, unknown>>(`/trainees/${id}`);
     },
@@ -121,6 +127,11 @@ export const api = {
   identity: {
     confirmMerge(matchId: string) {
       return request(`/identity-matches/${matchId}/confirm`, {
+        method: "POST",
+      });
+    },
+    rejectMerge(matchId: string) {
+      return request(`/identity-matches/${matchId}/reject`, {
         method: "POST",
       });
     },

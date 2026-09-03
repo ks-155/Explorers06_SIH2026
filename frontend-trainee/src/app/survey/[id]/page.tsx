@@ -12,8 +12,13 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { api } from "@/lib/api-client";
+import { api, getSession } from "@/lib/api-client";
 import { Locale, locales, t } from "@/lib/i18n";
+import { WithTrainee } from "@/lib/withTrainee";
+
+interface Profile {
+  preferred_language?: Locale;
+}
 
 interface SurveyQuestion {
   id: string;
@@ -39,7 +44,16 @@ export default function SurveyPage() {
   const params = useParams<{ id: string }>();
   const id = params?.id;
 
-  const [locale, setLocale] = useState<Locale>("hi");
+  const currentUserId = getSession()?.userId;
+  const profileQuery = useQuery({
+    queryKey: ["profile", currentUserId],
+    queryFn: () => api.trainees.get(currentUserId as string),
+    enabled: !!currentUserId,
+  });
+  const preferredLocale =
+    (profileQuery.data as Profile | undefined)?.preferred_language;
+
+  const [locale, setLocale] = useState<Locale>(preferredLocale || "hi");
   const [index, setIndex] = useState(0);
   const [responses, setResponses] = useState<Record<string, unknown>>({});
   const [showReason, setShowReason] = useState(false);
@@ -112,7 +126,8 @@ export default function SurveyPage() {
 
   if (done) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-gray-50 p-4">
+      <WithTrainee>
+        <div className="flex min-h-screen items-center justify-center bg-gray-50 p-4">
         <Card className="w-full max-w-md text-center">
           <CardHeader>
             <CardTitle className="text-xl font-bold">{t(locale, "thanks")}</CardTitle>
@@ -126,12 +141,14 @@ export default function SurveyPage() {
             </Button>
           </CardContent>
         </Card>
-      </div>
+        </div>
+      </WithTrainee>
     );
   }
 
   return (
-    <div className="flex min-h-screen flex-col bg-gray-50 p-4">
+    <WithTrainee>
+      <div className="flex min-h-screen flex-col bg-gray-50 p-4">
       <div className="mb-4 flex items-center justify-between">
         <span className="text-sm font-medium text-muted-foreground">
           {locale === "en" ? "Language" : "भाषा / भाषा"}
@@ -224,5 +241,6 @@ export default function SurveyPage() {
         </Card>
       )}
     </div>
+    </WithTrainee>
   );
 }
