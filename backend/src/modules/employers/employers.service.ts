@@ -21,10 +21,7 @@ export class EmployersService {
     private readonly audit: AuditService,
   ) {}
 
-  async create(
-    dto: CreateEmployerDto,
-    actor?: { id: string; role: string },
-  ) {
+  async create(dto: CreateEmployerDto, actor?: { id: string; role: string }) {
     const employer = await this.prisma.employer.create({
       data: {
         name: dto.name,
@@ -41,7 +38,7 @@ export class EmployersService {
     this.logger.log(`Employer created: ${employer.id} (${employer.name})`);
 
     await this.tryAudit({
-      actor: actor as any,
+      actor: actor,
       action: 'employer.create',
       entityType: 'employer',
       entityId: employer.id,
@@ -51,7 +48,13 @@ export class EmployersService {
     return employer;
   }
 
-  async findById(id: string) {
+  async findById(id: string, actor?: { role?: string; employerId?: string }) {
+    if (actor?.role === 'employer' && actor.employerId !== id) {
+      throw new ForbiddenException(
+        'You can only view your own employer profile',
+      );
+    }
+
     const employer = await this.prisma.employer.findUnique({
       where: { id },
       include: {

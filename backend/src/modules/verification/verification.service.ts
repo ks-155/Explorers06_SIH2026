@@ -69,7 +69,7 @@ export class VerificationService {
     );
 
     await this.tryAudit({
-      actor: actor as any,
+      actor: actor,
       action: 'employment.verify_triggered',
       entityType: 'employment_record',
       entityId: employmentId,
@@ -125,14 +125,11 @@ export class VerificationService {
 
     // Run the corresponding external (mocked) check for EPFO / Udyam.
     // Only grant the confidence points if the external check passes.
-    let contribution = baseContribution;
+    const contribution = baseContribution;
     let evidenceDataToStore = evidenceData ?? {};
-    if (
-      evidenceType === 'epfo_check' ||
-      evidenceType === 'udyam_link'
-    ) {
+    if (evidenceType === 'epfo_check' || evidenceType === 'udyam_link') {
       const check = await this.externalAdapter.checkEvidence(
-        evidenceType as ExternalEvidenceType,
+        evidenceType,
         evidenceData ?? {},
       );
 
@@ -192,7 +189,7 @@ export class VerificationService {
     );
 
     await this.tryAudit({
-      actor: actor as any,
+      actor: actor,
       action: 'employment.evidence_added',
       entityType: 'verification_evidence',
       entityId: evidence.id,

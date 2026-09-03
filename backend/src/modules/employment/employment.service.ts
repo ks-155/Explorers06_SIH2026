@@ -2,6 +2,7 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  ForbiddenException,
   Logger,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -19,13 +20,22 @@ export class EmploymentService {
 
   async create(
     dto: CreateEmploymentDto,
-    actor?: { id: string; role: string },
+    actor?: { id: string; role: string; traineeId?: string },
   ) {
+    const isTrainee = actor?.role === 'trainee';
+    const targetTraineeId = isTrainee ? actor.traineeId : dto.trainee_id;
+
+    if (!targetTraineeId) {
+      throw new BadRequestException(
+        'trainee_id is required (or the actor must be a trainee)',
+      );
+    }
+
     const trainee = await this.prisma.trainee.findUnique({
-      where: { id: dto.trainee_id },
+      where: { id: targetTraineeId },
     });
     if (!trainee) {
-      throw new NotFoundException(`Trainee ${dto.trainee_id} not found`);
+      throw new NotFoundException(`Trainee ${targetTraineeId} not found`);
     }
 
     if (dto.training_id) {
@@ -50,7 +60,7 @@ export class EmploymentService {
 
     const record = await this.prisma.employmentRecord.create({
       data: {
-        trainee_id: dto.trainee_id,
+        trainee_id: targetTraineeId,
         training_id: dto.training_id ?? null,
         employer_id: dto.employer_id ?? null,
         job_role: dto.job_role ?? null,
@@ -65,11 +75,11 @@ export class EmploymentService {
     });
 
     this.logger.log(
-      `Employment record created: ${record.id} (trainee: ${dto.trainee_id}, score: 20)`,
+      `Employment record created: ${record.id} (trainee: ${targetTraineeId}, score: 20)`,
     );
 
     await this.tryAudit({
-      actor: actor as any,
+      actor: actor,
       action: 'employment.create',
       entityType: 'employment_record',
       entityId: record.id,
@@ -86,7 +96,15 @@ export class EmploymentService {
     };
   }
 
-  async findById(id: string) {
+  async findById(
+    id: string,
+    actor?: {
+      id?: string;
+      role?: string;
+      traineeId?: string;
+      employerId?: string;
+    },
+  ) {
     const record = await this.prisma.employmentRecord.findUnique({
       where: { id },
       include: {
@@ -98,6 +116,20 @@ export class EmploymentService {
 
     if (!record) {
       throw new NotFoundException(`Employment record ${id} not found`);
+    }
+
+    const role = actor?.role;
+    const isPrivileged =
+      role === 'admin' || role === 'government' || role === 'provider';
+    const isOwnerTrainee =
+      role === 'trainee' && actor?.traineeId === record.trainee_id;
+    const isOwnerEmployer =
+      role === 'employer' && actor?.employerId === record.employer_id;
+
+    if (!isPrivileged && !isOwnerTrainee && !isOwnerEmployer) {
+      throw new ForbiddenException(
+        'You do not have access to this employment record',
+      );
     }
 
     return {

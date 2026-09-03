@@ -24,7 +24,7 @@ export class EmploymentController {
   constructor(private readonly employmentService: EmploymentService) {}
 
   @Post()
-  @Roles(Role.trainee, Role.employer, Role.provider, Role.admin)
+  @Roles(Role.trainee, Role.provider)
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Create employment record (self-reported)' })
   create(
@@ -35,8 +35,9 @@ export class EmploymentController {
   }
 
   @Get(':id')
+  @Roles(Role.trainee, Role.provider, Role.employer, Role.admin)
   @ApiOperation({ summary: 'Get employment record with confidence score' })
-  findOne(@Param('id') id: string) {
-    return this.employmentService.findById(id);
+  findOne(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
+    return this.employmentService.findById(id, user);
   }
 }
