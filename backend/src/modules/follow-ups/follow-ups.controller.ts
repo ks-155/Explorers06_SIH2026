@@ -25,7 +25,7 @@ export class FollowUpsController {
   }
 
   @Get('pending')
-  @Roles(Role.trainee, Role.admin, Role.provider)
+  @Roles(Role.trainee, Role.admin)
   @ApiOperation({ summary: 'Pending follow-ups for the logged-in trainee' })
   pending(@CurrentUser() actor: AuthenticatedUser) {
     const traineeId = actor.traineeId;
