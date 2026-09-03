@@ -39,8 +39,8 @@ export class ExternalVerificationAdapter {
   ): Promise<ExternalCheckResult> {
     switch (type) {
       case 'epfo_check': {
-        const uan = String(evidenceData?.uan ?? '');
-        const employerName = String(evidenceData?.employer_name ?? '');
+        const uan = this.asString(evidenceData?.uan);
+        const employerName = this.asString(evidenceData?.employer_name);
         if (!uan) {
           return { checked: false, verified: false };
         }
@@ -57,7 +57,7 @@ export class ExternalVerificationAdapter {
       }
 
       case 'udyam_link': {
-        const udyamNumber = String(evidenceData?.udyam_number ?? '');
+        const udyamNumber = this.asString(evidenceData?.udyam_number);
         if (!udyamNumber) {
           return { checked: false, verified: false };
         }
@@ -81,5 +81,9 @@ export class ExternalVerificationAdapter {
   /** Direct ESIC employment check (not tied to an evidence upload). */
   async checkEsic(insuranceNumber: string): Promise<EsicCheckResult> {
     return this.esic.check(insuranceNumber);
+  }
+
+  private asString(value: unknown): string {
+    return typeof value === 'string' ? value : '';
   }
 }

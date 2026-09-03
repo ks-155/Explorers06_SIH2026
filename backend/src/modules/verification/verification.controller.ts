@@ -1,14 +1,13 @@
 import {
   Controller,
   Post,
-  Get,
   Param,
   Body,
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
-import { Role } from '@prisma/client';
+import { Role, EvidenceType } from '@prisma/client';
 import { Roles } from '../../auth/decorators/roles.decorator';
 import {
   CurrentUser,
@@ -49,8 +48,8 @@ export class VerificationController {
   ) {
     return this.verificationService.addEvidence(
       id,
-      dto.evidence_type,
-      dto.evidence_data ?? {},
+      dto.evidence_type as EvidenceType,
+      (dto.evidence_data ?? {}) as Record<string, unknown>,
       user,
     );
   }

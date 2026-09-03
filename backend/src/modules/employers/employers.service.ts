@@ -6,7 +6,10 @@ import {
   Logger,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
-import { AuditService } from '../../common/audit/audit.service';
+import {
+  AuditService,
+  AuditEntryInput,
+} from '../../common/audit/audit.service';
 import { ConfidenceScoreService } from '../verification/confidence-score.service';
 import { CreateEmployerDto } from './dto/create-employer.dto';
 import { VerifyEmploymentDto } from './dto/verify-employer.dto';
@@ -235,7 +238,12 @@ export class EmployersService {
   }
 
   private async tryAudit(entry: {
-    actor?: { id?: string; role?: string } | null;
+    actor?: {
+      id?: string;
+      role?: string;
+      traineeId?: string;
+      employerId?: string;
+    } | null;
     action: string;
     entityType?: string;
     entityId?: string;
@@ -243,7 +251,7 @@ export class EmployersService {
     oldValue?: unknown;
   }) {
     try {
-      await this.audit.record(entry as any);
+      await this.audit.record(entry as AuditEntryInput);
     } catch (err) {
       this.logger.warn(
         `Audit write failed for ${entry.action} (${entry.entityId}): ${(err as Error).message}`,

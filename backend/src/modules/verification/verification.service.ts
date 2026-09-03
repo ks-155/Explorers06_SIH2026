@@ -5,12 +5,15 @@ import {
   Logger,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
-import { AuditService } from '../../common/audit/audit.service';
+import {
+  AuditService,
+  AuditEntryInput,
+} from '../../common/audit/audit.service';
 import { ConfidenceScoreService } from './confidence-score.service';
-import { VerificationStatus } from '@prisma/client';
+import { VerificationStatus, EvidenceType, Prisma } from '@prisma/client';
 import {
   ExternalVerificationAdapter,
-  ExternalEvidenceType,
+  ExternalCheckResult,
 } from '../adapters/external-verification.adapter';
 
 @Injectable()
@@ -93,8 +96,8 @@ export class VerificationService {
 
   async addEvidence(
     employmentId: string,
-    evidenceType: string,
-    evidenceData: any,
+    evidenceType: EvidenceType,
+    evidenceData: Record<string, unknown>,
     actor: { id?: string; role?: string } | null,
   ) {
     const record = await this.prisma.employmentRecord.findUnique({
@@ -113,25 +116,22 @@ export class VerificationService {
     }
 
     const existingTypes = record.evidence.map((e) => e.evidence_type);
-    if (existingTypes.includes(evidenceType as any)) {
+    if (existingTypes.includes(evidenceType)) {
       throw new BadRequestException(
         `Evidence type "${evidenceType}" already submitted`,
       );
     }
 
-    const baseContribution = this.confidenceScore.getEvidenceContribution(
-      evidenceType as any,
-    );
+    const baseContribution =
+      this.confidenceScore.getEvidenceContribution(evidenceType);
 
     // Run the corresponding external (mocked) check for EPFO / Udyam.
     // Only grant the confidence points if the external check passes.
     const contribution = baseContribution;
-    let evidenceDataToStore = evidenceData ?? {};
+    let evidenceDataToStore = evidenceData;
     if (evidenceType === 'epfo_check' || evidenceType === 'udyam_link') {
-      const check = await this.externalAdapter.checkEvidence(
-        evidenceType,
-        evidenceData ?? {},
-      );
+      const check: ExternalCheckResult =
+        await this.externalAdapter.checkEvidence(evidenceType, evidenceData);
 
       if (!check.checked || !check.verified) {
         throw new BadRequestException(
@@ -140,7 +140,7 @@ export class VerificationService {
       }
 
       evidenceDataToStore = {
-        ...(evidenceData ?? {}),
+        ...evidenceData,
         external_check: {
           verified: true,
           data: check.data ?? {},
@@ -151,15 +151,15 @@ export class VerificationService {
     const evidence = await this.prisma.verificationEvidence.create({
       data: {
         employment_id: employmentId,
-        evidence_type: evidenceType as any,
-        evidence_data: evidenceDataToStore,
+        evidence_type: evidenceType,
+        evidence_data: evidenceDataToStore as unknown as Prisma.InputJsonValue,
         verified_by: actor?.id ?? 'system',
         verified_at: new Date(),
         confidence_contribution: contribution,
       },
     });
 
-    const allEvidenceTypes = [...existingTypes, evidenceType] as any[];
+    const allEvidenceTypes: EvidenceType[] = [...existingTypes, evidenceType];
 
     const isEmployerConfirmed =
       record.verification_status === 'employer_confirmed' ||
@@ -211,7 +211,12 @@ export class VerificationService {
   }
 
   private async tryAudit(entry: {
-    actor?: { id?: string; role?: string } | null;
+    actor?: {
+      id?: string;
+      role?: string;
+      traineeId?: string;
+      employerId?: string;
+    } | null;
     action: string;
     entityType?: string;
     entityId?: string;
@@ -219,7 +224,7 @@ export class VerificationService {
     oldValue?: unknown;
   }) {
     try {
-      await this.audit.record(entry as any);
+      await this.audit.record(entry as AuditEntryInput);
     } catch (err) {
       this.logger.warn(
         `Audit write failed for ${entry.action} (${entry.entityId}): ${(err as Error).message}`,
