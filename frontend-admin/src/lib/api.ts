@@ -64,7 +64,7 @@ export function authFetch(url: string, token: string | null, init?: RequestInit)
 
 // --- Typed helpers per API-CONTRACT.md:195-219 (M2-04) ---
 export type LoginRequest = { identifier: string; password: string };
-export type LoginResponse = { accessToken: string; refreshToken: string; role: 'trainee' | 'employer' | 'provider' | 'government' | 'admin'; userId: string };
+export type LoginResponse = { accessToken: string; refreshToken: string; role: 'trainee' | 'employer' | 'provider' | 'government' | 'admin'; userId: string; traineeId?: string | null; employerId?: string | null };
 export type VerifyEmploymentReq = { employment_id: string; decision: 'confirm' | 'deny'; still_employed: boolean; job_relevant: boolean };
 export type PendingItem = { employment_id: string; trainee_name: string; job_role: string; training_job_role?: string; confidence_score?: number; joining_date?: string };
 export type AnalyticsDashboard = { trained: number; certified: number; verified_employed: number; unemployed: number; unreachable: number; retention: Record<string, number>; wage_progression: Record<string, number> };

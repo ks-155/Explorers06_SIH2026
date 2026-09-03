@@ -12,11 +12,12 @@ function normalizeKey(k: string): string {
   return k;
 }
 
-export function WageChart({ wage }: { wage: Record<string, number> }) {
+export function WageChart({ wage }: { wage: Record<string, number> | null | undefined }) {
   const [range, setRange] = useState<ToggleRange>('24m');
 
   const data = useMemo(() => {
-    const entries = Object.entries(wage)
+    const safeWage = wage && typeof wage === 'object' ? wage : {};
+    const entries = Object.entries(safeWage)
       .map(([k, v]) => ({ period: normalizeKey(k), raw: k, wage: v }))
       .sort((a, b) => WAGE_ORDER.indexOf(a.raw as never) - WAGE_ORDER.indexOf(b.raw as never));
     // filter by toggle: show up to selected range inclusive, always include start

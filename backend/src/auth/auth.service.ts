@@ -61,6 +61,8 @@ export class AuthService {
       refreshToken: tokens.refreshToken,
       role: payload.role,
       userId: payload.id,
+      traineeId: payload.traineeId ?? null,
+      employerId: payload.employerId ?? null,
     };
   }
 
