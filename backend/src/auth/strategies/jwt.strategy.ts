@@ -39,9 +39,10 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     }
     // Enforce string-typed IDs when present — prevents e.g. numeric injection
     // via a hand-crafted token that passes structure but breaks scoping casts.
+    // Allow null (prisma: trainee/employer not linked) — only reject non-string non-null.
     if (
-      (payload.employerId !== undefined && typeof payload.employerId !== 'string') ||
-      (payload.traineeId !== undefined && typeof payload.traineeId !== 'string')
+      (payload.employerId != null && typeof payload.employerId !== 'string') ||
+      (payload.traineeId != null && typeof payload.traineeId !== 'string')
     ) {
       throw new UnauthorizedException('Invalid token payload');
     }
