@@ -1,15 +1,16 @@
 'use client';
 import { Card, CardHeader, CardContent } from '@/components/ui/card';
-import { mockGovDashboard } from '@/mocks/govMock';
 
-export function KpiCards() {
-  const m = mockGovDashboard;
+type Props = { data: { trained: number; certified: number; verified_employed: number; unemployed: number; unreachable: number } | null };
+
+export function KpiCards({ data }: Props) {
+  if (!data) return <div className="text-sm text-gray-500">Loading KPIs…</div>;
   const items: [string, string | number][] = [
-    ['Trained', m.trained.toLocaleString()],
-    ['Certified', m.certified.toLocaleString()],
-    ['Verified employed', m.verified_employed.toLocaleString()],
-    ['Unemployed', m.unemployed.toLocaleString()],
-    ['Unreachable', m.unreachable.toLocaleString()],
+    ['Trained', data.trained.toLocaleString()],
+    ['Certified', data.certified.toLocaleString()],
+    ['Verified employed', data.verified_employed.toLocaleString()],
+    ['Unemployed', data.unemployed.toLocaleString()],
+    ['Unreachable', data.unreachable.toLocaleString()],
   ];
   return (
     <div className="grid grid-cols-2 md:grid-cols-5 gap-3">

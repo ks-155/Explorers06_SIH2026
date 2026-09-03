@@ -1,15 +1,18 @@
-// Mocks for local dev until backend merged / running — Phase 1
-// Not used when proxy to :3001 succeeds; kept for reference and tests
-export const mockLogin = {
-  government: { accessToken: 'mock.gov.jwt', refreshToken: 'mock.refresh', role: 'government' as const, userId: 'gov-1' },
-  employer: { accessToken: 'mock.emp.jwt', refreshToken: 'mock.refresh', role: 'employer' as const, userId: 'emp-1' },
-};
-export const mockDashboard = {
-  trained: 100000,
-  certified: 82000,
-  verified_employed: 51000,
-  unemployed: 9000,
-  unreachable: 10000,
-  retention: { '3m': 78, '6m': 69, '12m': 61, '24m': 54 },
-  wage_progression: { start: 12000, m6: 14500, m12: 17000 },
-};
+import { http, HttpResponse } from 'msw';
+import { mockPending } from './employerMock';
+import { mockGovDashboard, mockProviderRanking, mockSkillGaps } from './govMock';
+
+const API = '/api/v1';
+
+export const handlers = [
+  http.get(`${API}/employers/:id/verify-pending`, () => HttpResponse.json({ data: mockPending })),
+  http.post(`${API}/employers/:id/verify-employment`, async ({ request }) => {
+    const body = (await request.json()) as Record<string, unknown>;
+    return HttpResponse.json({ data: { success: true, verified: body, confidence_score: 60 } });
+  }),
+  http.get(`${API}/analytics/dashboard`, () => HttpResponse.json({ data: mockGovDashboard })),
+  http.get(`${API}/analytics/provider-ranking`, () => HttpResponse.json({ data: mockProviderRanking })),
+  http.get(`${API}/analytics/district/:id`, () => HttpResponse.json({ data: { topSectors: mockGovDashboard.topSectors } })),
+  http.get(`${API}/analytics/course/:id`, () => HttpResponse.json({ data: { id: 'course-1', retention: mockGovDashboard.retention, wage_progression: mockGovDashboard.wage_progression } })),
+  http.get(`${API}/analytics/skill-gaps`, () => HttpResponse.json({ data: mockSkillGaps })),
+];
