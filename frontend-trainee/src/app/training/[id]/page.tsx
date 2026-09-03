@@ -110,6 +110,10 @@ export default function TrainingPage() {
   const records = (trainingQuery.data ?? []) as TrainingRecord[];
   const employment = (employmentQuery.data ?? []) as EmploymentRecord[];
 
+  const notFound =
+    (profileQuery.error as Error)?.message?.toLowerCase().includes("not found") ||
+    (profileQuery.error as { statusCode?: number })?.statusCode === 404;
+
   const initial = (profile?.name?.trim()?.[0] ?? "T").toUpperCase();
   const isVerified =
     profile?.identity_status?.toLowerCase().includes("verified") ||
@@ -126,11 +130,47 @@ export default function TrainingPage() {
             </p>
           </div>
 
-          {trainingQuery.error && (
+          {profileQuery.error && notFound ? (
+            <Card className="rounded-lg border-amber-200 bg-amber-50">
+              <CardContent className="pt-5 text-sm">
+                <p className="font-medium text-amber-900">Trainee {id} not found</p>
+                <p className="text-amber-800 mt-1">
+                  This profile was created on an old local database that has since been
+                  re-seeded (latest GitHub commit adb6e09 fixes Home to use your live JWT
+                  traineeId). Your browser is still holding the stale ID
+                  <span className="font-mono"> {id}</span>.
+                </p>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <Button
+                    onClick={() => {
+                      try {
+                        localStorage.clear();
+                      } catch {}
+                      window.location.href = "/login";
+                    }}
+                    className="min-h-[44px] rounded-lg bg-amber-600 hover:bg-amber-700"
+                  >
+                    Clear session &amp; sign in again
+                  </Button>
+                  <Link href="/">
+                    <Button variant="outline" className="min-h-[44px] rounded-lg">
+                      Back to Home
+                    </Button>
+                  </Link>
+                </div>
+                <p className="text-xs text-amber-700 mt-3">
+                  Or open{" "}
+                  <span className="font-mono">http://localhost:3000/</span> → sign in with{" "}
+                  <span className="font-mono">trainee@sois.in / trainee123456</span> (live ID{" "}
+                  <span className="font-mono">c24d0712-e76e-4ddc-952a-0f06269a6822</span>).
+                </p>
+              </CardContent>
+            </Card>
+          ) : trainingQuery.error ? (
             <Alert variant="destructive" className="rounded-lg">
               <AlertDescription>{(trainingQuery.error as Error).message}</AlertDescription>
             </Alert>
-          )}
+          ) : null}
 
           {/* Verified Profile Card — avatar initial, training badges, shadow-sm rounded-lg */}
           {!profileQuery.isLoading && profile && (

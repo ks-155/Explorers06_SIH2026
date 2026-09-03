@@ -53,6 +53,10 @@ export function clearSession() {
 }
 
 // --- Generic request wrapper with global 401/403 handling ---
+// Stale Trainee ID fix: backend 404 "Trainee <id> not found" for a cached
+// USER_ID_KEY means localStorage is stale after DB re-seed. We preserve
+// statusCode on the thrown Error so pages (training/[id]/page.tsx) can show
+// a friendly "clear session & sign in again" card instead of raw text.
 async function request<T>(
   path: string,
   options: RequestInit = {}
@@ -92,7 +96,9 @@ async function request<T>(
     } catch {
       /* ignore parse errors */
     }
-    throw new Error(message);
+    const err = new Error(message) as Error & { statusCode?: number };
+    err.statusCode = res.status;
+    throw err;
   }
 
   const json = await res.json();
