@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { api } from "@/lib/api-client";
-import { ConfidenceBadge } from "@/components/ConfidenceBadge";
+import { ConfidenceBadge, ConfidenceLevel } from "@/components/ConfidenceBadge";
 import { WithTrainee } from "@/lib/withTrainee";
 
 interface Profile {
@@ -46,7 +46,7 @@ interface EmploymentRecord {
   joining_date?: string;
   verification_status?: string;
   confidence_score?: number;
-  level?: string;
+  level?: ConfidenceLevel;
 }
 
 export default function TrainingPage() {
@@ -167,7 +167,7 @@ export default function TrainingPage() {
                         {e.joining_date || "—"}
                       </div>
                     </div>
-                    <ConfidenceBadge score={e.confidence_score} />
+                    <ConfidenceBadge score={e.confidence_score} level={e.level} />
                   </div>
                   <div className="mt-2 text-xs text-muted-foreground">
                     Verification:{" "}
