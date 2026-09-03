@@ -18,7 +18,7 @@ export default function Providers({ children }: { children: React.ReactNode }) {
   );
 
   useEffect(() => {
-    if (process.env.NODE_ENV === "development") {
+    if (process.env.NEXT_PUBLIC_USE_MOCKS === "true") {
       import("@/mocks/bootstrap").then(({ enableMocks }) => {
         enableMocks().catch((e) => console.error("MSW failed to start", e));
       });

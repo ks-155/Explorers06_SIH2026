@@ -42,10 +42,6 @@ export function clearSession() {
 }
 
 // --- Generic request wrapper ---
-interface ApiEnvelope<T> {
-  data: T;
-}
-
 async function request<T>(
   path: string,
   options: RequestInit = {}
@@ -55,9 +51,9 @@ async function request<T>(
     "Content-Type": "application/json",
     ...((options.headers as Record<string, string>) || {}),
   };
-  if (token) headers["Authorization"] = `Bearer ${token}`;
+  if (token) headers["Authorization"] = "Bearer ";
 
-  const res = await fetch(`${API_PREFIX}${path}`, { ...options, headers });
+  const res = await fetch(${API_PREFIX}, { ...options, headers });
 
   if (!res.ok) {
     let message = res.statusText;
@@ -70,8 +66,12 @@ async function request<T>(
     throw new Error(message);
   }
 
-  const body = (await res.json()) as ApiEnvelope<T>;
-  return body.data;
+  const json = await res.json();
+  // Unwrap {data:T} envelope when present, otherwise return plain JSON (works for both)
+  if (json && typeof json === "object" && "data" in json) {
+    return (json as { data: T }).data as T;
+  }
+  return json as T;
 }
 
 // --- API surface (frozen contract, v1.0.0) ---
@@ -100,48 +100,48 @@ export const api = {
       });
     },
     get(id: string) {
-      return request<Record<string, unknown>>(`/trainees/${id}`);
+      return request<Record<string, unknown>>(/trainees/);
     },
     updateConsent(id: string, payload: Record<string, unknown>) {
-      return request(`/trainees/${id}/consent`, {
+      return request(/trainees//consent, {
         method: "PUT",
         body: JSON.stringify(payload),
       });
     },
     getTraining(id: string) {
-      return request<unknown[]>(`/trainees/${id}/training`);
+      return request<unknown[]>(/trainees//training);
     },
     getEmployment(id: string) {
-      return request<unknown[]>(`/trainees/${id}/employment`);
+      return request<unknown[]>(/trainees//employment);
     },
     updateContact(id: string, payload: Record<string, unknown>) {
-      return request(`/trainees/${id}/contact-update`, {
+      return request(/trainees//contact-update, {
         method: "PUT",
         body: JSON.stringify(payload),
       });
     },
     getMergeCandidates(id: string) {
-      return request<unknown[]>(`/trainees/${id}/merge-candidates`);
+      return request<unknown[]>(/trainees//merge-candidates);
     },
   },
   identity: {
     confirmMerge(matchId: string) {
-      return request(`/identity-matches/${matchId}/confirm`, {
+      return request(/identity-matches//confirm, {
         method: "POST",
       });
     },
     rejectMerge(matchId: string) {
-      return request(`/identity-matches/${matchId}/reject`, {
+      return request(/identity-matches//reject, {
         method: "POST",
       });
     },
   },
   followUps: {
     getPending() {
-      return request<unknown[]>(`/follow-ups/pending`);
+      return request<unknown[]>(/follow-ups/pending);
     },
     respond(id: string, payload: Record<string, unknown>) {
-      return request(`/follow-ups/${id}/respond`, {
+      return request(/follow-ups//respond, {
         method: "POST",
         body: JSON.stringify(payload),
       });
