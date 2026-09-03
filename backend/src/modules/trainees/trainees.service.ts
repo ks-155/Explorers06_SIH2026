@@ -158,6 +158,34 @@ export class TraineesService {
     });
   }
 
+  /**
+   * Employment records for a trainee (contract: GET /trainees/:id/employment).
+   * Owner-scoped like training records; includes the employer and a level band
+   * derived from the confidence score for consistency with EmploymentService.
+   */
+  async getEmploymentRecords(id: string, requester: AuthenticatedUser) {
+    await this.getTraineeOrThrow(id);
+    this.assertOwnerOrAdmin(id, requester);
+    const records = await this.prisma.employmentRecord.findMany({
+      where: { trainee_id: id },
+      include: {
+        employer: { select: { id: true, name: true, industry: true } },
+      },
+      orderBy: { joining_date: 'desc' },
+    });
+    return records.map((r) => ({
+      ...r,
+      level: this.levelFor(Number(r.confidence_score)),
+    }));
+  }
+
+  private levelFor(score: number): string {
+    if (score >= 80) return 'HIGH';
+    if (score >= 50) return 'MEDIUM';
+    if (score >= 20) return 'LOW';
+    return 'UNVERIFIED';
+  }
+
   /** Run identity matching for one trainee or a full sweep. */
   async runMatch(dto: RunMatchDto, actor: AuthenticatedUser) {
     const where: Prisma.TraineeWhereInput = dto.trainee_id

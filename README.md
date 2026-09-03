@@ -69,7 +69,11 @@ A **modular-monolith** platform with clear module boundaries:
 │   ├── src/app/(auth)/login/ # gov/employer login
 │   ├── src/app/(employer)/   # P2 VerifyCard + ConfidenceBadge
 │   └── src/app/(gov)/        # P3 KpiCards + ranking/district/skill-gaps (mocks)
-├── docker-compose.yml        # postgres + redis + backend (Arch/M6)
+├── docker-compose.yml        # postgres + redis + backend + fe-trainee + fe-admin — 5 services (Arch/M6 M6-01/02)
+├── backend/Dockerfile        # SOIS Backend — NestJS multi-stage (Member 5/6)
+├── frontend-trainee/Dockerfile # SOIS Trainee — Next.js :3000 multi-stage (M6-01)
+├── frontend-admin/Dockerfile # SOIS Admin — Next.js :3002 multi-stage (M6-01)
+├── .github/workflows/ci.yml  # CI — backend + frontends + compose build (M6-05)
 └── API-CONTRACT.md           # FROZEN API contract (Member 5, Phase 1)
 ```
 
@@ -154,7 +158,7 @@ Check:
 - Health: `curl http://localhost:3001/api/v1/health` → `{"status":"ok","database":"up"}`
 - Swagger: open `http://localhost:3001/docs` → click **Authorize** → paste `Bearer <accessToken>` from login
 
-> **Env:** `backend/.env.example` → `DATABASE_URL`, `PORT=3001`, `JWT_SECRET`, `BCRYPT_SALT_ROUNDS=10`.
+> **Env:** `backend/.env.example` (M6+M5) → `DATABASE_URL`, `REDIS_URL`, `PORT=3001`, `CORS_ALLOWED_ORIGINS`, `JWT_SECRET` (≥32 chars), `THROTTLE_*`, `BCRYPT_SALT_ROUNDS=10`.
 
 ### 4. Trainee App — `http://localhost:3000` (Member 1)
 
@@ -181,14 +185,15 @@ npm run dev                 # http://localhost:3002 (next.config.mjs: dev -p 300
 
 Flow to test: `http://localhost:3002/login` (gov/employer) → `http://localhost:3002/employer/[id]` (VerifyCard confirm/deny, `ConfidenceBadge` HIGH/MED/LOW) → `http://localhost:3002/dashboard` (KpiCards + ranking/district — `lib/withRole.tsx` guards `government`/`admin` only).
 
-### 6. Full-stack via Docker (alternative)
+### 6. Full-stack via Docker (alternative) — M6-01/02 5 services
 
 ```bash
-docker compose up --build          # builds backend + postgres + redis
+docker compose up --build          # builds backend + postgres + redis + fe-trainee + fe-admin — M6-01/02
 docker compose logs -f backend     # tail logs
+docker compose ps                  # 5 services healthy
 ```
 
-> Frontend Docker: `frontend-trainee/` and `frontend-admin/` have no compose entry — run via `npm run dev` as above (per `ARCHITECTURE.md` local dev).
+> Full stack now via compose — `fe-trainee:3000` + `fe-admin:3002` built from multi-stage Dockerfiles (M6-01). Backend entrypoint: `sh -c "npx prisma migrate deploy && npx prisma db seed || true && npm run start:prod"` (M6-02).
 
 ### Demo Accounts (seeded via `prisma db seed`)
 
