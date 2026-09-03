@@ -10,6 +10,10 @@ export const handlers = [
     const body = (await request.json()) as Record<string, unknown>;
     return HttpResponse.json({ data: { success: true, verified: body, confidence_score: 60 } });
   }),
+  http.post(`${API}/employment/:id/evidence`, async ({ params, request }) => {
+    const body = (await request.json()) as Record<string, unknown>;
+    return HttpResponse.json({ data: { employment: { id: params.id, confidence_score: 75, level: 'MEDIUM' }, breakdown: { attached: body }, success: true } });
+  }),
   http.get(`${API}/analytics/dashboard`, () => HttpResponse.json({ data: mockGovDashboard })),
   http.get(`${API}/analytics/provider-ranking`, () => HttpResponse.json({ data: mockProviderRanking })),
   http.get(`${API}/analytics/district/:id`, () => HttpResponse.json({ data: { topSectors: mockGovDashboard.topSectors } })),
