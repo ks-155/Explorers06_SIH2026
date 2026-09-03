@@ -6,7 +6,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
-import { FollowUpStatus, Prisma } from '@prisma/client';
+import { Channel, FollowUpStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AuditService } from '../../common/audit/audit.service';
 import { AuthenticatedUser } from '../../common/decorators/current-user.decorator';
@@ -15,7 +15,7 @@ import { RespondFollowUpDto } from './dto/respond-followup.dto';
 
 const FOLLOW_UP_INTERVALS = [30, 90, 180, 365, 730]; // days: 30d, 3m, 6m, 12m, 24m
 const MAX_RETRY_ATTEMPTS = 3;
-const RETRY_CHANNEL_ORDER: string[] = ['whatsapp', 'sms', 'phone'];
+const RETRY_CHANNEL_ORDER: Channel[] = ['whatsapp', 'sms', 'phone'];
 
 @Injectable()
 export class FollowUpsService {
@@ -120,7 +120,80 @@ export class FollowUpsService {
     this.logger.log(
       `Follow-up ${id} responded (${dto.response_time_seconds}s)`,
     );
+
+    // I3.1 (P3 integration): "working:yes" response → employment signal.
+    // Best-effort: never fail the respond call if signal creation fails.
+    await this.createEmploymentSignalIfWorking(followUp, dto, requester);
+
     return updated;
+  }
+
+  /**
+   * I3.1 — WORKFLOW-FLOW.md:189: follow-up "Working: Yes" → employment
+   * record (consumed by M3 verification). Creates a self-reported stub only
+   * when the follow-up has no linked employment yet. Idempotent per
+   * follow-up: re-responds are blocked above, and concurrent calls resolve
+   * to a single record via the followUp.employment_id check + update.
+   */
+  private async createEmploymentSignalIfWorking(
+    followUp: { id: string; trainee_id: string; employment_id: string | null },
+    dto: RespondFollowUpDto,
+    requester: AuthenticatedUser,
+  ): Promise<void> {
+    try {
+      const responses: Record<string, unknown> = dto.responses ?? {};
+      const working = responses['working'];
+      const isWorking =
+        working === true ||
+        working === 'yes' ||
+        working === 'Yes' ||
+        working === 'YES' ||
+        working === 1 ||
+        working === '1';
+
+      if (!isWorking || followUp.employment_id) {
+        return;
+      }
+
+      const record = await this.prisma.employmentRecord.create({
+        data: {
+          trainee_id: followUp.trainee_id,
+          verification_status: 'self_reported',
+          confidence_score: 20,
+          job_relevant_to_training:
+            typeof responses['job_relevant'] === 'boolean'
+              ? responses['job_relevant']
+              : typeof responses['job_relevance'] === 'boolean'
+                ? responses['job_relevance']
+                : null,
+        },
+      });
+
+      await this.prisma.followUp.update({
+        where: { id: followUp.id },
+        data: { employment_id: record.id },
+      });
+
+      await this.audit.record({
+        actor: requester,
+        action: 'employment.create',
+        entityType: 'employment_record',
+        entityId: record.id,
+        newValue: {
+          trainee_id: record.trainee_id,
+          source: 'followup.signal',
+          follow_up_id: followUp.id,
+        },
+      });
+
+      this.logger.log(
+        `Employment signal created: ${record.id} from follow-up ${followUp.id}`,
+      );
+    } catch (err) {
+      this.logger.warn(
+        `Employment signal failed for follow-up ${followUp.id}: ${(err as Error).message}`,
+      );
+    }
   }
 
   /** Pending follow-ups for a trainee (scoped by JWT). */
@@ -205,7 +278,7 @@ export class FollowUpsService {
           data: {
             trainee_id: trainee.id,
             months_after_training: days,
-            channel: trainee.preferred_channel as any,
+            channel: trainee.preferred_channel as Channel,
             follow_up_date: dueDate,
             status: FollowUpStatus.scheduled,
             questions: Prisma.JsonNull,
@@ -257,8 +330,8 @@ export class FollowUpsService {
       data: {
         status: nextStatus,
         attempts,
-        channel_attempts: channelAttempts as Prisma.InputJsonValue,
-        channel: (nextChannel ?? followUp.channel) as any,
+        channel_attempts: channelAttempts,
+        channel: nextChannel ?? followUp.channel,
         next_retry_at: nextRetryAt,
       },
     });
@@ -269,7 +342,11 @@ export class FollowUpsService {
       entityType: 'follow_up',
       entityId: id,
       oldValue: { attempts: followUp.attempts, channel: followUp.channel },
-      newValue: { attempts, channel: nextChannel ?? 'exhausted', status: nextStatus },
+      newValue: {
+        attempts,
+        channel: nextChannel ?? 'exhausted',
+        status: nextStatus,
+      },
     });
 
     this.logger.log(

@@ -17,7 +17,11 @@ import { RunMatchDto } from './dto/run-match.dto';
 @Injectable()
 export class TraineesService {
   private readonly logger = new Logger(TraineesService.name);
-  private readonly weights: { aadhaar: number; phone: number; nameDistrict: number };
+  private readonly weights: {
+    aadhaar: number;
+    phone: number;
+    nameDistrict: number;
+  };
 
   constructor(
     private readonly prisma: PrismaService,

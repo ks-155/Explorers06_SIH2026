@@ -8,7 +8,6 @@ import {
   IsDateString,
   IsNumber,
   IsUUID,
-  Max,
   Min,
 } from 'class-validator';
 import { EmploymentType } from '@prisma/client';

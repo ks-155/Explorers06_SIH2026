@@ -13,22 +13,22 @@ export class SkillGapsService {
 
   /** Dashboard KPIs: total trainees, placements, retention, avg wage. */
   async dashboard() {
-    const [
-      totalTrainees,
-      totalPlacements,
-      verifiedPlacements,
-      avgSalary,
-    ] = await Promise.all([
-      this.prisma.trainee.count({ where: { consent_given: true } }),
-      this.prisma.employmentRecord.count(),
-      this.prisma.employmentRecord.count({
-        where: { verification_status: { in: ['employer_confirmed', 'evidence_confirmed'] } },
-      }),
-      this.prisma.employmentRecord.aggregate({
-        _avg: { current_salary: true },
-        where: { current_salary: { not: null } },
-      }),
-    ]);
+    const [totalTrainees, totalPlacements, verifiedPlacements, avgSalary] =
+      await Promise.all([
+        this.prisma.trainee.count({ where: { consent_given: true } }),
+        this.prisma.employmentRecord.count(),
+        this.prisma.employmentRecord.count({
+          where: {
+            verification_status: {
+              in: ['employer_confirmed', 'evidence_confirmed'],
+            },
+          },
+        }),
+        this.prisma.employmentRecord.aggregate({
+          _avg: { current_salary: true },
+          where: { current_salary: { not: null } },
+        }),
+      ]);
 
     const retention3m = await this.getRetention(90);
     const retention6m = await this.getRetention(180);
@@ -75,7 +75,9 @@ export class SkillGapsService {
     });
 
     if (traineesWithCert.length === 0) return 0;
-    const placed = traineesWithCert.filter((t) => t.employment_records.length > 0).length;
+    const placed = traineesWithCert.filter(
+      (t) => t.employment_records.length > 0,
+    ).length;
     return Math.round((placed / traineesWithCert.length) * 100);
   }
 
@@ -88,7 +90,9 @@ export class SkillGapsService {
       const cutoff = new Date();
       cutoff.setDate(cutoff.getDate() - days);
 
-      const rows = await this.prisma.$queryRaw<{ avg_salary: number; cnt: bigint }[]>`
+      const rows = await this.prisma.$queryRaw<
+        { avg_salary: number; cnt: bigint }[]
+      >`
         SELECT AVG(e.current_salary)::float AS avg_salary, COUNT(*) AS cnt
         FROM employment_records e
         JOIN training_records t ON e.training_id = t.id
@@ -109,7 +113,13 @@ export class SkillGapsService {
   /** Provider ranking: top providers by placement rate. */
   async providerRanking() {
     return this.prisma.$queryRaw<
-      { provider_id: string; name: string; total_trainees: bigint; placements: bigint; placement_rate: number }[]
+      {
+        provider_id: string;
+        name: string;
+        total_trainees: bigint;
+        placements: bigint;
+        placement_rate: number;
+      }[]
     >`
       SELECT
         p.id AS provider_id,
@@ -153,7 +163,12 @@ export class SkillGapsService {
   /** Course analytics: placement rate by sector/course. */
   async courseAnalytics() {
     return this.prisma.$queryRaw<
-      { sector: string; total_trainees: bigint; placements: bigint; placement_rate: number }[]
+      {
+        sector: string;
+        total_trainees: bigint;
+        placements: bigint;
+        placement_rate: number;
+      }[]
     >`
       SELECT
         COALESCE(tr.sector, 'Unknown') AS sector,

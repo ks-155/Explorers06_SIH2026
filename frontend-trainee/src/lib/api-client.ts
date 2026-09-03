@@ -51,9 +51,9 @@ async function request<T>(
     "Content-Type": "application/json",
     ...((options.headers as Record<string, string>) || {}),
   };
-  if (token) headers["Authorization"] = "Bearer ";
+  if (token) headers["Authorization"] = `Bearer ${token}`;
 
-  const res = await fetch(${API_PREFIX}, { ...options, headers });
+  const res = await fetch(`${API_PREFIX}${path}`, { ...options, headers });
 
   if (!res.ok) {
     let message = res.statusText;
@@ -100,48 +100,48 @@ export const api = {
       });
     },
     get(id: string) {
-      return request<Record<string, unknown>>(/trainees/);
+      return request<Record<string, unknown>>(`/trainees/${id}`);
     },
     updateConsent(id: string, payload: Record<string, unknown>) {
-      return request(/trainees//consent, {
+      return request(`/trainees/${id}/consent`, {
         method: "PUT",
         body: JSON.stringify(payload),
       });
     },
     getTraining(id: string) {
-      return request<unknown[]>(/trainees//training);
+      return request<unknown[]>(`/trainees/${id}/training`);
     },
     getEmployment(id: string) {
-      return request<unknown[]>(/trainees//employment);
+      return request<unknown[]>(`/trainees/${id}/employment`);
     },
     updateContact(id: string, payload: Record<string, unknown>) {
-      return request(/trainees//contact-update, {
+      return request(`/trainees/${id}/contact-update`, {
         method: "PUT",
         body: JSON.stringify(payload),
       });
     },
     getMergeCandidates(id: string) {
-      return request<unknown[]>(/trainees//merge-candidates);
+      return request<unknown[]>(`/trainees/${id}/merge-candidates`);
     },
   },
   identity: {
     confirmMerge(matchId: string) {
-      return request(/identity-matches//confirm, {
+      return request(`/identity-matches/${matchId}/confirm`, {
         method: "POST",
       });
     },
     rejectMerge(matchId: string) {
-      return request(/identity-matches//reject, {
+      return request(`/identity-matches/${matchId}/reject`, {
         method: "POST",
       });
     },
   },
   followUps: {
     getPending() {
-      return request<unknown[]>(/follow-ups/pending);
+      return request<unknown[]>(`/follow-ups/pending`);
     },
     respond(id: string, payload: Record<string, unknown>) {
-      return request(/follow-ups//respond, {
+      return request(`/follow-ups/${id}/respond`, {
         method: "POST",
         body: JSON.stringify(payload),
       });
