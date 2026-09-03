@@ -8,8 +8,6 @@ const DIRECT_BASE =
 const API_BASE = process.env.NEXT_PUBLIC_API_URL
   ? `${process.env.NEXT_PUBLIC_API_URL.replace(/\/$/, "")}/api/v1`
   : "/api/v1";
-// Keep alias for backwards compat if any module imported API_PREFIX
-const API_PREFIX = API_BASE;
 
 // --- Storage helpers (JWT) ---
 const ACCESS_TOKEN_KEY = "sois_access_token";
@@ -188,6 +186,22 @@ export const api = {
     },
     respond(id: string, payload: Record<string, unknown>) {
       return request(`/follow-ups/${id}/respond`, {
+        method: "POST",
+        body: JSON.stringify(payload),
+      });
+    },
+  },
+  employment: {
+    create(payload: {
+      trainee_id: string;
+      training_id?: string;
+      job_role?: string;
+      employment_type: string;
+      joining_date?: string;
+      current_salary?: number;
+      job_relevant_to_training?: boolean;
+    }) {
+      return request<{ id: string }>("/employment", {
         method: "POST",
         body: JSON.stringify(payload),
       });
