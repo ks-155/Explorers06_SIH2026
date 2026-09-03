@@ -8,8 +8,6 @@ const DIRECT_BASE =
 const API_BASE = process.env.NEXT_PUBLIC_API_URL
   ? `${process.env.NEXT_PUBLIC_API_URL.replace(/\/$/, "")}/api/v1`
   : "/api/v1";
-// Keep alias for backwards compat if any module imported API_PREFIX
-const API_PREFIX = API_BASE;
 
 // --- Storage helpers (JWT) ---
 const ACCESS_TOKEN_KEY = "sois_access_token";
@@ -27,12 +25,17 @@ export function setSession(data: {
   refreshToken?: string;
   role: string;
   userId?: string;
+  traineeId?: string | null;
+  employerId?: string | null;
 }) {
   if (typeof window === "undefined") return;
   localStorage.setItem(ACCESS_TOKEN_KEY, data.accessToken);
   if (data.refreshToken) localStorage.setItem(REFRESH_TOKEN_KEY, data.refreshToken);
   localStorage.setItem(ROLE_KEY, data.role);
   if (data.userId) localStorage.setItem(USER_ID_KEY, data.userId);
+  // Persist linked entity ids for role-scoped navigation (fix: was using userId as traineeId)
+  if (data.traineeId) localStorage.setItem("sois_trainee_id", data.traineeId);
+  if (data.employerId) localStorage.setItem("sois_employer_id", data.employerId);
 }
 
 export function getSession() {
@@ -41,6 +44,8 @@ export function getSession() {
     accessToken: localStorage.getItem(ACCESS_TOKEN_KEY),
     role: localStorage.getItem(ROLE_KEY),
     userId: localStorage.getItem(USER_ID_KEY),
+    traineeId: localStorage.getItem("sois_trainee_id"),
+    employerId: localStorage.getItem("sois_employer_id"),
   };
 }
 
@@ -50,6 +55,8 @@ export function clearSession() {
   localStorage.removeItem(REFRESH_TOKEN_KEY);
   localStorage.removeItem(ROLE_KEY);
   localStorage.removeItem(USER_ID_KEY);
+  localStorage.removeItem("sois_trainee_id");
+  localStorage.removeItem("sois_employer_id");
 }
 
 // --- Generic request wrapper with global 401/403 handling ---
@@ -118,6 +125,8 @@ export const api = {
         refreshToken: string;
         role: string;
         userId: string;
+        traineeId?: string | null;
+        employerId?: string | null;
       }>("/auth/login", { method: "POST", body: JSON.stringify(payload) });
     },
   },
@@ -177,6 +186,22 @@ export const api = {
     },
     respond(id: string, payload: Record<string, unknown>) {
       return request(`/follow-ups/${id}/respond`, {
+        method: "POST",
+        body: JSON.stringify(payload),
+      });
+    },
+  },
+  employment: {
+    create(payload: {
+      trainee_id: string;
+      training_id?: string;
+      job_role?: string;
+      employment_type: string;
+      joining_date?: string;
+      current_salary?: number;
+      job_relevant_to_training?: boolean;
+    }) {
+      return request<{ id: string }>("/employment", {
         method: "POST",
         body: JSON.stringify(payload),
       });

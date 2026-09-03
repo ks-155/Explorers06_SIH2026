@@ -64,12 +64,83 @@ export function authFetch(url: string, token: string | null, init?: RequestInit)
 
 // --- Typed helpers per API-CONTRACT.md:195-219 (M2-04) ---
 export type LoginRequest = { identifier: string; password: string };
-export type LoginResponse = { accessToken: string; refreshToken: string; role: 'trainee' | 'employer' | 'provider' | 'government' | 'admin'; userId: string };
+export type LoginResponse = { accessToken: string; refreshToken: string; role: 'trainee' | 'employer' | 'provider' | 'government' | 'admin'; userId: string; traineeId?: string | null; employerId?: string | null };
 export type VerifyEmploymentReq = { employment_id: string; decision: 'confirm' | 'deny'; still_employed: boolean; job_relevant: boolean };
 export type PendingItem = { employment_id: string; trainee_name: string; job_role: string; training_job_role?: string; confidence_score?: number; joining_date?: string };
-export type AnalyticsDashboard = { trained: number; certified: number; verified_employed: number; unemployed: number; unreachable: number; retention: Record<string, number>; wage_progression: Record<string, number> };
-export type ProviderRank = { id: string; name: string; placement: number; retention: number; district: string };
-export type SkillGap = { skill_name?: string; skill?: string; gap_type: string; recommendation: string; gap_description?: string };
+export type AnalyticsDashboard = {
+  trained: number;
+  certified: number;
+  verified_employed: number;
+  unemployed: number;
+  unreachable: number;
+  total_trainees?: number;
+  total_placements?: number;
+  verified_placements?: number;
+  avg_monthly_salary?: number | null;
+  retention: Record<string, number>;
+  wage_progression: Record<string, number>;
+  funnel?: {
+    enrolled: number;
+    trained: number;
+    certified: number;
+    placed: number;
+    verified: number;
+    retention_3m: number;
+    retention_6m: number;
+    retention_12m: number;
+    retention_24m: number;
+  };
+  outcome_breakdown?: { label: string; count: number; type?: string }[];
+  follow_up_monitoring?: {
+    scheduled: number;
+    sent: number;
+    responded: number;
+    failed: number;
+    cancelled: number;
+    response_rate: number;
+  };
+  non_placement_reasons?: { reason: string; count: number; percentage: number }[];
+  verification?: {
+    self_reported: number;
+    pending: number;
+    employer_confirmed: number;
+    evidence_confirmed: number;
+    rejected: number;
+    confidence: { high: number; medium: number; low: number; unverified: number };
+  };
+};
+export type CourseAnalyticsRow = {
+  sector: string;
+  total_trainees: number;
+  placements: number;
+  placement_rate: number;
+};
+export type ProviderRank = {
+  id: string;
+  name: string;
+  placement: number;
+  retention: number | null;
+  district: string;
+  total_trainees?: number;
+  placements?: number;
+};
+export type SkillGap = {
+  skill_name?: string;
+  skill?: string;
+  gap_type: string;
+  recommendation: string;
+  gap_description?: string;
+  sector?: string;
+  job_role?: string;
+};
+export type DistrictAnalytics = {
+  district_id: number;
+  district_name: string;
+  total_trainees: number;
+  placements: number;
+  placement_rate: number;
+  topSectors: { sector: string; employed: number }[];
+};
 
 export async function login(req: LoginRequest): Promise<LoginResponse> {
   const res = await fetch(`${BASE}/auth/login`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(req) });
@@ -101,14 +172,14 @@ export async function getProviderRanking(token: string): Promise<ProviderRank[]>
   return handleJson(res);
 }
 
-export async function getDistrictAnalytics(districtId: string, token: string): Promise<unknown> {
+export async function getDistrictAnalytics(districtId: string, token: string): Promise<DistrictAnalytics> {
   const res = await authFetch(`/analytics/district/${districtId}`, token);
-  return handleJson(res);
+  return handleJson<DistrictAnalytics>(res);
 }
 
-export async function getCourseAnalytics(courseId: string, token: string): Promise<unknown> {
-  const res = await authFetch(`/analytics/course/${courseId}`, token);
-  return handleJson(res);
+export async function getCourseAnalytics(token: string): Promise<CourseAnalyticsRow[]> {
+  const res = await authFetch('/analytics/course', token);
+  return handleJson<CourseAnalyticsRow[]>(res);
 }
 
 export async function getSkillGaps(token: string): Promise<SkillGap[]> {

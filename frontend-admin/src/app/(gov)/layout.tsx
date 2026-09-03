@@ -8,8 +8,9 @@ import { Skeleton } from '@/components/ui/skeleton';
 
 const nav = [
   { href: '/dashboard', label: 'Overview' },
-  { href: '/dashboard/ranking', label: 'Provider Ranking' },
-  { href: '/dashboard/district/pune', label: 'District' },
+  { href: '/dashboard/ranking', label: 'Providers' },
+  { href: '/dashboard/course', label: 'Courses' },
+  { href: '/dashboard/district/pune', label: 'Districts' },
   { href: '/dashboard/skill-gaps', label: 'Skill Gaps' },
 ];
 
@@ -104,7 +105,7 @@ export default function GovLayout({ children }: { children: React.ReactNode }) {
             Sign out
           </button>
         </div>
-        <p className="text-xs text-slate-400 mt-2">Phase 3 gov-ov: RBAC live, mocks until Phase 5 live analytics</p>
+        <p className="text-xs text-slate-400 mt-2">Maharashtra outcome intelligence · live PostgreSQL data</p>
       </aside>
       <section className="flex-1 min-w-0">{children}</section>
     </div>

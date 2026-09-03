@@ -9,12 +9,22 @@ export type StoredAuth = {
   refreshToken: string;
   role: Role;
   userId: string;
+  traineeId?: string | null;
+  employerId?: string | null;
 };
 
 const KEY = 'sois_admin_auth';
 
 export function saveAuth(a: StoredAuth) {
   if (typeof window === 'undefined') return;
+  // Decode JWT to enrich with traineeId/employerId if not already present (fix employer scoping)
+  try {
+    if (!a.traineeId || !a.employerId) {
+      const payload = JSON.parse(atob(a.accessToken.split('.')[1]));
+      if (!a.traineeId && payload.traineeId) a.traineeId = payload.traineeId;
+      if (!a.employerId && payload.employerId) a.employerId = payload.employerId;
+    }
+  } catch {}
   localStorage.setItem(KEY, JSON.stringify(a));
 }
 

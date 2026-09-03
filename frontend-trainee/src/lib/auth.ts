@@ -22,14 +22,19 @@ export function useLogin() {
         refreshToken: data.refreshToken,
         role: data.role,
         userId: data.userId,
+        traineeId: (data as { traineeId?: string | null }).traineeId ?? null,
+        employerId: (data as { employerId?: string | null }).employerId ?? null,
       });
-      // Trainee lands on their training view; fall back to home if no userId.
+      // Fix: use traineeId for trainee role, not userId (user.id = d46b..., trainee.id = c24d...)
+      const traineeId = (data as { traineeId?: string | null }).traineeId;
       const target =
-        data.role === "trainee" && data.userId
-          ? `/training/${data.userId}`
-          : data.role === "trainee"
-            ? "/training"
-            : "/";
+        data.role === "trainee" && traineeId
+          ? `/training/${traineeId}`
+          : data.role === "trainee" && data.userId
+            ? `/training/${data.userId}`
+            : data.role === "trainee"
+              ? "/training"
+              : "/";
       router.push(target);
     },
     onError: (err: Error) => setError(err.message),

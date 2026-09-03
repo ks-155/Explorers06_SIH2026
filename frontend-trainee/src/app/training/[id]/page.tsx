@@ -2,7 +2,8 @@
 
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -13,6 +14,8 @@ import {
 } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { api } from "@/lib/api-client";
 import { ConfidenceBadge, ConfidenceLevel } from "@/components/ConfidenceBadge";
 import { WithTrainee } from "@/lib/withTrainee";
@@ -87,6 +90,13 @@ function WhyThisScore({ verificationStatus }: { verificationStatus?: string }) {
 export default function TrainingPage() {
   const params = useParams<{ id: string }>();
   const id = params?.id;
+  const queryClient = useQueryClient();
+  const [showReportForm, setShowReportForm] = useState(false);
+  const [jobRole, setJobRole] = useState("");
+  const [employmentType, setEmploymentType] = useState("full_time");
+  const [joiningDate, setJoiningDate] = useState("");
+  const [salary, setSalary] = useState("");
+  const [reportError, setReportError] = useState<string | null>(null);
 
   const profileQuery = useQuery({
     queryKey: ["profile", id],
@@ -109,6 +119,29 @@ export default function TrainingPage() {
   const profile = profileQuery.data as Profile | undefined;
   const records = (trainingQuery.data ?? []) as TrainingRecord[];
   const employment = (employmentQuery.data ?? []) as EmploymentRecord[];
+  const primaryTraining = records[0];
+
+  const reportEmployment = useMutation({
+    mutationFn: () =>
+      api.employment.create({
+        trainee_id: id as string,
+        training_id: primaryTraining?.id,
+        job_role: jobRole || undefined,
+        employment_type: employmentType,
+        joining_date: joiningDate || undefined,
+        current_salary: salary ? Number(salary) : undefined,
+        job_relevant_to_training: true,
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["employment", id] });
+      setShowReportForm(false);
+      setJobRole("");
+      setJoiningDate("");
+      setSalary("");
+      setReportError(null);
+    },
+    onError: (err: Error) => setReportError(err.message),
+  });
 
   const notFound =
     (profileQuery.error as Error)?.message?.toLowerCase().includes("not found") ||
@@ -320,15 +353,106 @@ export default function TrainingPage() {
             </Card>
           ))}
 
-          {/* Employment + confidence (M1-04 / Phase 4 badge) */}
+          {/* Employment + confidence */}
           {employmentQuery.isLoading && (
             <div className="space-y-3 animate-in fade-in duration-200">
               <Skeleton className="h-24 w-full rounded-lg" />
             </div>
           )}
-          {employment.length > 0 && (
+
+          {!employmentQuery.isLoading && (
             <div className="space-y-3 animate-in fade-in slide-in-from-bottom-2 duration-200">
-              <h2 className="text-lg font-semibold text-slate-900">Employment Status</h2>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <h2 className="text-lg font-semibold text-slate-900">Current Outcome</h2>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowReportForm((v) => !v)}
+                  className="min-h-[36px]"
+                >
+                  {showReportForm ? "Cancel" : "Report employment"}
+                </Button>
+              </div>
+
+              {showReportForm && (
+                <Card className="rounded-lg border border-teal-200 bg-teal-50/30">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-base">Report your employment status</CardTitle>
+                    <CardDescription>
+                      Self-reported outcomes start verification. Your employer may be contacted to confirm.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    {reportError && (
+                      <Alert variant="destructive">
+                        <AlertDescription>{reportError}</AlertDescription>
+                      </Alert>
+                    )}
+                    <div className="space-y-2">
+                      <Label htmlFor="employment_type">Outcome type</Label>
+                      <select
+                        id="employment_type"
+                        value={employmentType}
+                        onChange={(e) => setEmploymentType(e.target.value)}
+                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                      >
+                        <option value="full_time">Employed (full time)</option>
+                        <option value="part_time">Employed (part time)</option>
+                        <option value="contract">Contract</option>
+                        <option value="self_employed">Self-employed</option>
+                        <option value="apprenticeship">Apprenticeship</option>
+                      </select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="job_role">Job role</Label>
+                      <Input
+                        id="job_role"
+                        value={jobRole}
+                        onChange={(e) => setJobRole(e.target.value)}
+                        placeholder="e.g. Solar Technician"
+                      />
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div className="space-y-2">
+                        <Label htmlFor="joining_date">Joining date</Label>
+                        <Input
+                          id="joining_date"
+                          type="date"
+                          value={joiningDate}
+                          onChange={(e) => setJoiningDate(e.target.value)}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="salary">Monthly salary (INR)</Label>
+                        <Input
+                          id="salary"
+                          type="number"
+                          min={0}
+                          value={salary}
+                          onChange={(e) => setSalary(e.target.value)}
+                          placeholder="18000"
+                        />
+                      </div>
+                    </div>
+                    <Button
+                      onClick={() => reportEmployment.mutate()}
+                      disabled={reportEmployment.isPending}
+                      className="w-full sm:w-auto min-h-[44px]"
+                    >
+                      {reportEmployment.isPending ? "Submitting…" : "Submit outcome"}
+                    </Button>
+                  </CardContent>
+                </Card>
+              )}
+
+              {employment.length === 0 && !showReportForm && (
+                <Card className="rounded-lg border-dashed">
+                  <CardContent className="py-6 text-center text-sm text-muted-foreground">
+                    No employment outcome recorded yet. Use &quot;Report employment&quot; after training completion or follow-up.
+                  </CardContent>
+                </Card>
+              )}
+
               {employment.map((e) => (
                 <Card key={e.id} className="rounded-lg shadow-sm border">
                   <CardContent className="pt-5 text-sm">

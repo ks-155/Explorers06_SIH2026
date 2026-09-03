@@ -3,7 +3,7 @@
 // was @Controller('analytics')). They are now in their own module. SkillGapsController
 // remains responsible only for GET /analytics/skill-gaps.
 
-import { Controller, Get } from '@nestjs/common';
+import { Controller, Get, Param } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Role } from '@prisma/client';
 import { Roles } from '../../auth/decorators/roles.decorator';
@@ -45,9 +45,16 @@ export class AnalyticsController {
 
   @Get('district')
   @Roles(Role.admin, Role.government)
-  @ApiOperation({ summary: 'Analytics by district' })
+  @ApiOperation({ summary: 'Analytics by district (all districts)' })
   district() {
     return this.analyticsService.districtAnalytics();
+  }
+
+  @Get('district/:id')
+  @Roles(Role.admin, Role.government)
+  @ApiOperation({ summary: 'District analytics detail' })
+  districtById(@Param('id') id: string) {
+    return this.analyticsService.districtById(id);
   }
 
   @Get('course')

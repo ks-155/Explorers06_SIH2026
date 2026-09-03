@@ -13,4 +13,10 @@ export class LoginResponseDto {
 
   @ApiProperty({ description: 'Authenticated user id' })
   userId: string;
+
+  @ApiProperty({ description: 'Linked trainee id (if role=trainee)', required: false })
+  traineeId?: string | null;
+
+  @ApiProperty({ description: 'Linked employer id (if role=employer)', required: false })
+  employerId?: string | null;
 }

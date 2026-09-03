@@ -19,7 +19,8 @@ export default function Home() {
 
   useEffect(() => {
     const s = getSession();
-    if (s?.userId && s?.role === "trainee") setTraineeId(s.userId);
+    if (s?.traineeId && s?.role === "trainee") setTraineeId(s.traineeId);
+    else if (s?.userId && s?.role === "trainee") setTraineeId(s.userId);
   }, []);
 
   const TRAINEE_ID = traineeId ?? null;

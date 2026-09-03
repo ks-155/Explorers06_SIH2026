@@ -8,7 +8,7 @@ import { Card, CardHeader, CardContent } from '@/components/ui/card';
 import { VerifyCard, type VerifyEmploymentReq } from '@/components/employer/VerifyCard';
 import { ConfidenceBadge } from '@/components/employer/ConfidenceBadge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { mockPending } from '@/mocks/employerMock';
+import { QueryErrorState } from '@/components/ui/query-state';
 import { addEvidence, getVerifyPending, postVerifyEmployment, type AddEvidenceResponse, type EvidenceType } from '@/lib/api';
 
 type RespondedItem = { employment_id: string; trainee_name: string; decision: string; time: string; score?: number; level?: string };
@@ -75,7 +75,7 @@ function EmployerDashboardInner({ params }: { params: { id: string } }) {
   const role = auth?.role ?? null;
 
   // Live GET /employers/:id/verify-pending (M2-01) — stale 5min, retry 1, refetchOnWindowFocus false (inherited from Providers)
-  const { data: livePending, isLoading, error } = useQuery({
+  const { data: livePending, isLoading, error, refetch } = useQuery({
     queryKey: ['pending', id],
     queryFn: () => getVerifyPending(id, token!),
     enabled: !!token,
@@ -84,16 +84,16 @@ function EmployerDashboardInner({ params }: { params: { id: string } }) {
     refetchOnWindowFocus: false,
   });
 
-  const effectivePending = error ? mockPending : livePending !== undefined ? (livePending as never as typeof mockPending) : mockPending;
+  const effectivePending = livePending ?? [];
 
   const verifyMut = useMutation({
     mutationFn: (req: VerifyEmploymentReq) => postVerifyEmployment(id, token!, req),
     onMutate: async (req) => {
       await qc.cancelQueries({ queryKey: ['pending', id] });
-      const previous = qc.getQueryData(['pending', id]) as typeof mockPending | undefined;
+      const previous = qc.getQueryData(['pending', id]) as typeof effectivePending | undefined;
       // optimistic: remove from pending cache immediately
       qc.setQueryData(['pending', id], (old: unknown) => {
-        const list = (old as typeof mockPending | undefined) ?? effectivePending;
+        const list = (old as typeof effectivePending | undefined) ?? effectivePending;
         return list.filter((x) => x.employment_id !== req.employment_id);
       });
       return { previous };
@@ -135,18 +135,9 @@ function EmployerDashboardInner({ params }: { params: { id: string } }) {
 
   async function onVerify(req: VerifyEmploymentReq) {
     const start = Date.now();
-    const elapsed = ((Date.now() - start) / 1000).toFixed(1);
-    setLastElapsed(elapsed);
-    // If backend reachable, use live mutation with optimistic update; else fallback to local mock removal
-    if (token && !error) {
-      verifyMut.mutate(req);
-    } else {
-      await new Promise((r) => setTimeout(r, 200));
-      const item = effectivePending.find((x) => x.employment_id === req.employment_id);
-      if (item) setResponded((r) => [...r, { employment_id: item.employment_id, trainee_name: item.trainee_name, decision: req.decision, time: `${elapsed}s` }]);
-      setToast(`✓ Verification recorded successfully (Confidence Score updated) — ${item?.trainee_name ?? req.employment_id} (mock fallback)`);
-      setTimeout(() => setToast(null), 4000);
-    }
+    setLastElapsed(((Date.now() - start) / 1000).toFixed(1));
+    if (!token) return;
+    verifyMut.mutate(req);
   }
 
   function toggleEvidence(employmentId: string, key: EvidenceKey) {
@@ -164,13 +155,7 @@ function EmployerDashboardInner({ params }: { params: { id: string } }) {
       setTimeout(() => setToast(null), 4000);
       return;
     }
-    if (!token || error) {
-      await new Promise((r) => setTimeout(r, 200));
-      const bonus = checked.reduce((s, o) => s + o.points, 0);
-      setToast(`✓ Evidence attached (mock fallback): ${checked.map((c) => c.label).join(', ')} (~+${bonus} pts) for ${employmentId}`);
-      setTimeout(() => setToast(null), 4000);
-      return;
-    }
+    if (!token) return;
     setEvidenceBusy(employmentId);
     try {
       let last: AddEvidenceResponse | null = null;
@@ -211,9 +196,16 @@ function EmployerDashboardInner({ params }: { params: { id: string } }) {
           Employer ID: <span className="font-mono text-white">{id}</span> · Role: {role} · Port :3002{' '}
           {lastElapsed && <span className="ml-2 inline-flex items-center rounded-full bg-emerald-600 px-2.5 py-0.5 text-xs font-semibold text-white">last verify: {lastElapsed}s</span>}
           {isLoading && <span className="ml-2 inline-flex items-center gap-1 text-xs text-slate-300"><Loader2 className="h-3 w-3" /> Loading pending…</span>}
-          {error && <span className="ml-2 text-xs text-amber-300">live fetch failed — showing mock fallback</span>}
         </p>
       </div>
+
+      {error && (
+        <QueryErrorState
+          title="Unable to load pending verifications"
+          message={(error as Error).message}
+          onRetry={() => refetch()}
+        />
+      )}
 
       <div className="grid grid-cols-3 gap-3">
         <Card className="rounded-lg shadow-sm border-slate-200 transition-all duration-200 hover:scale-[1.01] hover:shadow-md">
@@ -264,7 +256,7 @@ function EmployerDashboardInner({ params }: { params: { id: string } }) {
 
       {filter === 'pending' ? (
         <Card className="rounded-lg shadow-sm border-slate-200 overflow-hidden transition-all duration-200">
-          <CardHeader className="font-semibold text-slate-900 bg-slate-50 rounded-t-lg">Pending — GET /api/v1/employers/:id/verify-pending (live, fallback mock)</CardHeader>
+          <CardHeader className="font-semibold text-slate-900 bg-slate-50 rounded-t-lg">Pending verifications</CardHeader>
           <CardContent className="space-y-4 p-4 bg-white">
             {isLoading ? (
               <div className="space-y-3">
@@ -272,7 +264,7 @@ function EmployerDashboardInner({ params }: { params: { id: string } }) {
                 <Skeleton className="h-12 w-full" />
                 <Skeleton className="h-64 w-full" />
               </div>
-            ) : effectivePending.length === 0 ? (
+            ) : error ? null : effectivePending.length === 0 ? (
               <p className="text-sm text-slate-500">All caught up — no pending verifications.</p>
             ) : (
               effectivePending.map((item) => (
@@ -307,7 +299,6 @@ function EmployerDashboardInner({ params }: { params: { id: string } }) {
                 </div>
               ))
             )}
-            <p className="text-xs text-slate-400">Live POST /api/v1/employers/:id/verify-employment employment_id, decision, still_employed, job_relevant per API-CONTRACT.md:204. Mock fallback keeps demo when backend offline.</p>
           </CardContent>
         </Card>
       ) : (
