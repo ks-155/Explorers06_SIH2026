@@ -1,4 +1,7 @@
+"use client";
+
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -9,10 +12,21 @@ import {
 } from "@/components/ui/card";
 import { surveyDict } from "@/lib/i18n";
 import { ClipboardList, Settings2, UserPlus } from "lucide-react";
-
-const TRAINEE_ID = "9f8c3d1e-2b4a-4c7d-9f2e-6a1b3c5d7e9f";
+import { getSession } from "@/lib/api-client";
 
 export default function Home() {
+  const [traineeId, setTraineeId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const s = getSession();
+    if (s?.userId && s?.role === "trainee") setTraineeId(s.userId);
+  }, []);
+
+  const TRAINEE_ID = traineeId ?? null;
+  const trainingHref = TRAINEE_ID ? `/training/${TRAINEE_ID}` : "/login";
+  const identityHref = TRAINEE_ID ? `/identity/${TRAINEE_ID}` : "/login";
+  const contactHref = TRAINEE_ID ? `/contact/${TRAINEE_ID}` : "/login";
+  const consentHref = TRAINEE_ID ? `/consent/${TRAINEE_ID}` : "/login";
   return (
     <main className="flex min-h-screen flex-col items-center justify-center gap-8 p-6">
       <div className="max-w-2xl text-center">
@@ -64,7 +78,7 @@ export default function Home() {
             </CardDescription>
           </CardHeader>
           <CardContent className="mt-auto flex flex-col gap-2">
-            <Link href={`/training/${TRAINEE_ID}`}>
+            <Link href={trainingHref}>
               <Button variant="outline" className="w-full">
                 Training
               </Button>
@@ -74,6 +88,9 @@ export default function Home() {
                 Follow-up Survey
               </Button>
             </Link>
+            {!TRAINEE_ID && (
+              <p className="text-xs text-amber-600">Sign in to view your training.</p>
+            )}
           </CardContent>
         </Card>
 
@@ -89,21 +106,24 @@ export default function Home() {
             </CardDescription>
           </CardHeader>
           <CardContent className="mt-auto flex flex-col gap-2">
-            <Link href={`/identity/${TRAINEE_ID}`}>
+            <Link href={identityHref}>
               <Button variant="outline" className="w-full">
                 Identity / Merge
               </Button>
             </Link>
-            <Link href={`/contact/${TRAINEE_ID}`}>
+            <Link href={contactHref}>
               <Button variant="outline" className="w-full">
                 Update Contact
               </Button>
             </Link>
-            <Link href={`/consent/${TRAINEE_ID}`}>
+            <Link href={consentHref}>
               <Button variant="outline" className="w-full">
                 Consent
               </Button>
             </Link>
+            {!TRAINEE_ID && (
+              <p className="text-xs text-amber-600">Sign in to manage your profile.</p>
+            )}
           </CardContent>
         </Card>
       </div>
