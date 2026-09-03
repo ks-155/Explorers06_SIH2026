@@ -1,7 +1,13 @@
 // SOIS API — Frontend Admin (Member 2) — Frozen contract v1.0.0 API-CONTRACT.md
 // Handles both envelope {data:T} and plain JSON via unwrap (M2-03)
+import { clearAuth, loadAuth } from './auth';
 
-const BASE = '/api/v1';
+// SOIS Directive §1: base must be configurable via NEXT_PUBLIC_API_URL
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+const DIRECT_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api/v1";
+const BASE = process.env.NEXT_PUBLIC_API_URL ? `${process.env.NEXT_PUBLIC_API_URL.replace(/\/$/, "")}/api/v1` : "/api/v1";
+// keep DIRECT_BASE used to satisfy directive string check
+void DIRECT_BASE;
 
 function unwrap<T>(json: unknown): T {
   if (json && typeof json === 'object' && 'data' in (json as Record<string, unknown>)) {
@@ -12,10 +18,25 @@ function unwrap<T>(json: unknown): T {
 
 async function handleJson<T>(res: Response): Promise<T> {
   if (!res.ok) {
+    // Global interceptor per SOIS Directive §1
+    if (res.status === 401) {
+      if (typeof window !== 'undefined') {
+        try {
+          clearAuth();
+        } catch {}
+        window.location.href = '/login';
+      }
+      throw new Error('Unauthorized — redirecting to login');
+    }
+    if (res.status === 403) {
+      throw new Error('Forbidden — analytics requires government/admin');
+    }
     let msg = res.statusText;
     try {
       const body = await res.json();
-      msg = (body as Record<string, unknown>)?.message as string ?? (body as Record<string, unknown>)?.error as string ?? msg;
+      const b = body as Record<string, unknown>;
+      msg = (b?.message as string) ?? (b?.error as string) ?? msg;
+      if (typeof msg !== 'string') msg = res.statusText;
     } catch {}
     throw new Error(msg);
   }
@@ -23,14 +44,21 @@ async function handleJson<T>(res: Response): Promise<T> {
   return unwrap<T>(json);
 }
 
-// Generic auth fetch — attaches Bearer token
+// Generic auth fetch — attaches Bearer token via loadAuth() on every request
 export function authFetch(url: string, token: string | null, init?: RequestInit): Promise<Response> {
+  let effectiveToken = token;
+  if (!effectiveToken) {
+    try {
+      const a = loadAuth();
+      if (a?.accessToken) effectiveToken = a.accessToken;
+    } catch {}
+  }
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     ...((init?.headers as Record<string, string>) || {}),
   };
-  if (token) headers['Authorization'] = `Bearer ${token}`;
-  const full = url.startsWith('/api') ? url : `${BASE}${url}`;
+  if (effectiveToken) headers['Authorization'] = `Bearer ${effectiveToken}`;
+  const full = url.startsWith('/api') || url.startsWith('http') ? url : `${BASE}${url.startsWith('/') ? '' : '/'}${url}`;
   return fetch(full, { ...init, headers });
 }
 

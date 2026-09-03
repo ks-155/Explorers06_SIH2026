@@ -15,6 +15,7 @@ import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { api } from "@/lib/api-client";
 import { WithTrainee } from "@/lib/withTrainee";
+import { Loader2 } from "lucide-react";
 
 export default function ContactPage() {
   const params = useParams<{ id: string }>();
@@ -51,7 +52,7 @@ export default function ContactPage() {
 
   return (
     <WithTrainee>
-      <div className="flex min-h-screen items-center justify-center bg-gray-50 p-4">
+      <div className="flex min-h-screen items-center justify-center bg-gray-50 p-4 animate-in fade-in slide-in-from-bottom-2 duration-200">
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-1">
           <CardTitle className="text-2xl font-bold">Update Contact Details</CardTitle>
@@ -119,6 +120,7 @@ export default function ContactPage() {
               </div>
             </div>
             <Button type="submit" className="w-full" disabled={isPending}>
+              {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden />}
               {isPending ? "Saving…" : "Update Contact"}
             </Button>
           </form>

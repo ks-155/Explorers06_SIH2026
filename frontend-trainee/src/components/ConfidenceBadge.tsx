@@ -12,9 +12,10 @@ export type ConfidenceLevel =
   | "HIGH";
 
 const LEVEL_STYLE: Record<ConfidenceLevel, string> = {
-  HIGH: "bg-green-100 text-green-800 border-green-300",
-  MEDIUM: "bg-amber-100 text-amber-800 border-amber-300",
-  LOW: "bg-red-100 text-red-800 border-red-300",
+  // SOIS directive: high #059669 emerald-600, medium #d97706 amber-600, low #dc2626 red-600, all text-white
+  HIGH: "bg-emerald-600 text-white border-emerald-600",
+  MEDIUM: "bg-amber-600 text-white border-amber-600",
+  LOW: "bg-red-600 text-white border-red-600",
   UNVERIFIED: "bg-gray-100 text-gray-600 border-gray-300",
 };
 
@@ -40,7 +41,9 @@ export function ConfidenceBadge({
       ? { label: level, color: LEVEL_STYLE[level] }
       : confidenceLevel(score);
   return (
-    <span className={`px-2 py-1 rounded-full text-xs border ${resolved.color}`}>
+    <span
+      className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border shadow-sm ${resolved.color}`}
+    >
       {resolved.label}
       {score != null ? ` ${score}%` : ""}
     </span>

@@ -12,6 +12,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Skeleton } from "@/components/ui/skeleton";
 import { api } from "@/lib/api-client";
 import { Locale, locales, t } from "@/lib/i18n";
 import { WithTrainee } from "@/lib/withTrainee";
@@ -35,7 +36,7 @@ export default function SurveyList() {
 
   return (
     <WithTrainee>
-      <div className="min-h-screen bg-gray-50 p-4">
+      <div className="min-h-screen bg-gray-50 p-4 animate-in fade-in slide-in-from-bottom-2 duration-200">
       <div className="mx-auto max-w-2xl space-y-4">
         <div className="flex items-center justify-between">
           <div>
@@ -63,34 +64,42 @@ export default function SurveyList() {
           </Alert>
         )}
 
-        {isLoading && <p className="text-sm text-muted-foreground">Loading…</p>}
+        {isLoading && (
+          <div className="space-y-3 animate-in fade-in duration-200">
+            <Skeleton className="h-28 w-full rounded-lg" />
+            <Skeleton className="h-28 w-full rounded-lg" />
+          </div>
+        )}
 
         {!isLoading && items.length === 0 && (
-          <Card>
+          <Card className="animate-in fade-in duration-200">
             <CardContent className="pt-6 text-sm text-muted-foreground">
               {t(locale, "noPending")}
             </CardContent>
           </Card>
         )}
 
-        {items.map((f) => (
-          <Card key={f.id}>
-            <CardHeader>
-              <CardTitle>{t(locale, "pendingTitle")}</CardTitle>
-              <CardDescription>
-                {f.follow_up_date ? `Due ${f.follow_up_date}` : "Due now"} ·{" "}
-                {f.months_after_training != null
-                  ? `${f.months_after_training} month${f.months_after_training === 1 ? "" : "s"} after training`
-                  : "recent training"}
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Link href={`/survey/${f.id}`}>
-                <Button size="sm">{t(locale, "start")}</Button>
-              </Link>
-            </CardContent>
-          </Card>
-        ))}
+        {!isLoading &&
+          items.map((f) => (
+            <Card key={f.id} className="animate-in fade-in slide-in-from-bottom-2 duration-200 shadow-sm hover:shadow-md transition-shadow">
+              <CardHeader>
+                <CardTitle>{t(locale, "pendingTitle")}</CardTitle>
+                <CardDescription>
+                  {f.follow_up_date ? `Due ${f.follow_up_date}` : "Due now"} ·{" "}
+                  {f.months_after_training != null
+                    ? `${f.months_after_training} month${f.months_after_training === 1 ? "" : "s"} after training`
+                    : "recent training"}
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Link href={`/survey/${f.id}`}>
+                  <Button size="sm" className="min-h-[44px]">
+                    {t(locale, "start")}
+                  </Button>
+                </Link>
+              </CardContent>
+            </Card>
+          ))}
       </div>
       </div>
     </WithTrainee>

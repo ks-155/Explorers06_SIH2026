@@ -12,9 +12,11 @@ import {
 } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Skeleton } from "@/components/ui/skeleton";
 import { api } from "@/lib/api-client";
 import { useQuery } from "@tanstack/react-query";
 import { WithTrainee } from "@/lib/withTrainee";
+import { Loader2 } from "lucide-react";
 
 const CONSENT_VERSION = "1.0";
 
@@ -60,7 +62,7 @@ export default function ConsentPage() {
 
   return (
     <WithTrainee>
-      <div className="flex min-h-screen items-center justify-center bg-gray-50 p-4">
+      <div className="flex min-h-screen items-center justify-center bg-gray-50 p-4 animate-in fade-in slide-in-from-bottom-2 duration-200">
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-1">
           <CardTitle className="text-2xl font-bold">Consent to Share Outcome</CardTitle>
@@ -85,6 +87,12 @@ export default function ConsentPage() {
               Consent version {CONSENT_VERSION}
             </p>
           </div>
+          {profileQuery.isLoading && (
+            <div className="space-y-2 animate-in fade-in duration-200">
+              <Skeleton className="h-4 w-32" />
+              <Skeleton className="h-20 w-full rounded-lg" />
+            </div>
+          )}
           {!profileQuery.isLoading && currentConsent != null && (
             <p className="text-sm text-muted-foreground">
               Current status:{" "}
@@ -105,6 +113,9 @@ export default function ConsentPage() {
                 disabled={isPending}
                 onClick={() => submit(true)}
               >
+                {isPending && consentGiven === true && (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden />
+                )}
                 Yes, I consent
               </Button>
               <Button
@@ -113,6 +124,9 @@ export default function ConsentPage() {
                 disabled={isPending}
                 onClick={() => submit(false)}
               >
+                {isPending && consentGiven === false && (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden />
+                )}
                 Not now
               </Button>
             </div>

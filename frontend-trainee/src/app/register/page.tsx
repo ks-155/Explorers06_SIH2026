@@ -14,6 +14,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { api } from "@/lib/api-client";
+import { Loader2 } from "lucide-react";
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -30,6 +31,10 @@ export default function RegisterPage() {
     setError(null);
     setIsPending(true);
     try {
+      // Privacy: Aadhaar is never sent raw from the frontend.
+      // If an Aadhaar field were collected, it would be hashed client-side or
+      // more securely hashed server-side; backend is responsible for hashing
+      // and never storing raw Aadhaar. This form does not collect Aadhaar.
       const payload = {
         name,
         phone,
@@ -50,7 +55,7 @@ export default function RegisterPage() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gray-50 p-4">
+    <div className="flex min-h-screen items-center justify-center bg-gray-50 p-4 animate-in fade-in slide-in-from-bottom-2 duration-200">
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-1">
           <CardTitle className="text-2xl font-bold">Trainee Registration</CardTitle>
@@ -129,6 +134,7 @@ export default function RegisterPage() {
               </div>
             </div>
             <Button type="submit" className="w-full" disabled={isPending}>
+              {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden />}
               {isPending ? "Registering..." : "Register"}
             </Button>
           </form>

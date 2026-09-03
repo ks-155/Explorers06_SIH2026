@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react';
 import { getHealth } from '@/lib/api';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
 
 export default function HealthPage() {
   const [data, setData] = useState<Record<string, unknown> | null>(null);
@@ -12,13 +13,13 @@ export default function HealthPage() {
       .catch((e) => setErr(e instanceof Error ? e.message : String(e)));
   }, []);
   return (
-    <main className="p-6 max-w-2xl mx-auto">
-      <Card>
+    <main className="p-6 max-w-2xl mx-auto animate-page-enter">
+      <Card className="transition-all duration-200 hover:shadow-md">
         <CardHeader className="font-medium">Health — GET /api/v1/health (proxy → :3001)</CardHeader>
         <CardContent>
           {err && <p className="text-sm text-red-600">{err} — backend not running or proxy misconfigured (next.config.mjs).</p>}
           {data && <pre className="text-xs bg-gray-50 p-3 rounded">{JSON.stringify(data, null, 2)}</pre>}
-          {!data && !err && <p className="text-sm text-gray-500">Loading…</p>}
+          {!data && !err && <Skeleton className="h-12 w-full" />}
         </CardContent>
       </Card>
     </main>

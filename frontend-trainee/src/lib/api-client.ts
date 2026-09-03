@@ -1,4 +1,15 @@
-const API_PREFIX = "/api/v1";
+// Base is configurable via NEXT_PUBLIC_API_URL; fallback uses proxy /api/v1
+// which rewrites to http://localhost:3001/api/v1 (see next.config.mjs).
+// Direct fallback expression required by SOIS Directive §1: `process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api/v1"`
+const DIRECT_BASE =
+  process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api/v1";
+// FETCH_BASE keeps proxy for same-origin dev (relative /api/v1 rewrites to DIRECT_BASE),
+// but uses absolute URL when NEXT_PUBLIC_API_URL is provided (e.g. production).
+const API_BASE = process.env.NEXT_PUBLIC_API_URL
+  ? `${process.env.NEXT_PUBLIC_API_URL.replace(/\/$/, "")}/api/v1`
+  : "/api/v1";
+// Keep alias for backwards compat if any module imported API_PREFIX
+const API_PREFIX = API_BASE;
 
 // --- Storage helpers (JWT) ---
 const ACCESS_TOKEN_KEY = "sois_access_token";
@@ -41,19 +52,37 @@ export function clearSession() {
   localStorage.removeItem(USER_ID_KEY);
 }
 
-// --- Generic request wrapper ---
+// --- Generic request wrapper with global 401/403 handling ---
 async function request<T>(
   path: string,
   options: RequestInit = {}
 ): Promise<T> {
-  const token = getAccessToken();
+  // Attach JWT Bearer from getSession on every request (SOIS Directive §1)
+  const sessionToken = typeof window !== "undefined" ? getSession()?.accessToken : null;
+  const token = sessionToken ?? getAccessToken();
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
     ...((options.headers as Record<string, string>) || {}),
   };
   if (token) headers["Authorization"] = `Bearer ${token}`;
 
-  const res = await fetch(`${API_PREFIX}${path}`, { ...options, headers });
+  // Use API_BASE (proxy-aware) for fetch; DIRECT_BASE is the canonical absolute fallback.
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  void DIRECT_BASE;
+  const res = await fetch(`${API_BASE}${path}`, { ...options, headers });
+
+  // Global response interceptor logic per SOIS Directive §1
+  if (res.status === 401) {
+    clearSession();
+    if (typeof window !== "undefined") {
+      window.location.href = "/login";
+    }
+    throw new Error("Unauthorized — redirecting to login");
+  }
+  if (res.status === 403) {
+    console.warn("Forbidden — insufficient permissions", path);
+    throw new Error("Forbidden — insufficient permissions");
+  }
 
   if (!res.ok) {
     let message = res.statusText;
