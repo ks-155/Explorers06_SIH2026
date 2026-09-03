@@ -39,12 +39,18 @@ export function KpiCards({ data }: Props) {
         ))}
       </div>
     );
+
+  const formatNum = (val: number | undefined | null) =>
+    typeof val === 'number' ? val.toLocaleString() : '0';
+
+  // Backend may return either {trained, ...} or {total_trainees, ...}; handle both.
+  const raw = data as unknown as Record<string, unknown>;
   const items: { label: string; value: string; spark: number[]; color: string; trend: string }[] = [
-    { label: 'Trained', value: data.trained.toLocaleString(), spark: [82, 88, 92, 96, 100], color: '#1e293b', trend: '+4.2%' },
-    { label: 'Certified', value: data.certified.toLocaleString(), spark: [70, 75, 80, 78, 82], color: '#2563eb', trend: '+2.1%' },
-    { label: 'Verified employed', value: data.verified_employed.toLocaleString(), spark: [40, 44, 48, 50, 51], color: '#059669', trend: '+5.8%' },
-    { label: 'Unemployed', value: data.unemployed.toLocaleString(), spark: [12, 11, 10, 9, 9], color: '#d97706', trend: '-3.4%' },
-    { label: 'Unreachable', value: data.unreachable.toLocaleString(), spark: [14, 13, 12, 11, 10], color: '#dc2626', trend: '-2.0%' },
+    { label: 'Trained', value: formatNum((raw.trained as number) ?? (raw.total_trainees as number)), spark: [82, 88, 92, 96, 100], color: '#1e293b', trend: '+4.2%' },
+    { label: 'Certified', value: formatNum(raw.certified as number), spark: [70, 75, 80, 78, 82], color: '#2563eb', trend: '+2.1%' },
+    { label: 'Verified employed', value: formatNum((raw.verified_employed as number) ?? (raw.verified_placements as number)), spark: [40, 44, 48, 50, 51], color: '#059669', trend: '+5.8%' },
+    { label: 'Unemployed', value: formatNum(raw.unemployed as number), spark: [12, 11, 10, 9, 9], color: '#d97706', trend: '-3.4%' },
+    { label: 'Unreachable', value: formatNum(raw.unreachable as number), spark: [14, 13, 12, 11, 10], color: '#dc2626', trend: '-2.0%' },
   ];
   return (
     <div className="grid grid-cols-2 md:grid-cols-5 gap-3 animate-page-enter">
