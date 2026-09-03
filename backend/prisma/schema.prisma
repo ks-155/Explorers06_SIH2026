@@ -293,6 +293,10 @@ model FollowUp {
   responses            Json?
   non_placement_reason String?      @db.Text
   response_time_seconds Int?
+  // retry tracking
+  attempts             Int          @default(0)
+  channel_attempts     Json?        // { whatsapp: true, sms: true, phone: false }
+  next_retry_at        DateTime?    @db.Timestamptz(6)
   created_at           DateTime     @default(now()) @db.Timestamptz(6)
 
   trainee    Trainee            @relation(fields: [trainee_id], references: [id], onDelete: Cascade)
