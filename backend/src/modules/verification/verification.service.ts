@@ -23,7 +23,7 @@ export class VerificationService {
   private readonly validTransitions: Record<string, VerificationStatus[]> = {
     self_reported: ['pending'],
     pending: ['employer_confirmed', 'rejected'],
-    employer_confirmed: ['evidence_confirmed', 'pending'],
+    employer_confirmed: ['evidence_confirmed'],
     evidence_confirmed: [],
     rejected: [],
   };
@@ -172,7 +172,9 @@ export class VerificationService {
     );
 
     const newStatus: VerificationStatus =
-      score.total >= 80 ? 'evidence_confirmed' : record.verification_status;
+      isEmployerConfirmed && score.total >= 80
+        ? 'evidence_confirmed'
+        : record.verification_status;
 
     const updated = await this.prisma.employmentRecord.update({
       where: { id: employmentId },
