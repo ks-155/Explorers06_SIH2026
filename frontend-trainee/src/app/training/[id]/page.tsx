@@ -49,6 +49,32 @@ interface EmploymentRecord {
   level?: ConfidenceLevel;
 }
 
+function WhyThisScore({ verificationStatus }: { verificationStatus?: string }) {
+  const status = (verificationStatus ?? "").toLowerCase();
+  const isConfirmed =
+    status.includes("employer_confirmed") ||
+    status.includes("evidence_confirmed");
+  const isSelfReported =
+    status.includes("self_reported") || status.includes("pending");
+
+  return (
+    <div className="mt-2 rounded-md bg-muted p-2 text-xs text-muted-foreground">
+      <p className="font-medium">Why this score?</p>
+      <p>
+        Self-report +20 · Employer confirmed +40 · Salary slip +15 · Bank
+        statement +10 · Offer letter +10 · Udyam +5 · EPFO +20 · cap 100
+      </p>
+      {isConfirmed ? (
+        <p>Employer confirmation is counted in this score.</p>
+      ) : isSelfReported ? (
+        <p>Score grows when your employer confirms and evidence is added.</p>
+      ) : (
+        <p>Add evidence and employer confirmation to grow this score.</p>
+      )}
+    </div>
+  );
+}
+
 export default function TrainingPage() {
   const params = useParams<{ id: string }>();
   const id = params?.id;
@@ -176,6 +202,7 @@ export default function TrainingPage() {
                     </span>{" "}
                     {e.level ? `· ${e.level}` : ""}
                   </div>
+                  <WhyThisScore verificationStatus={e.verification_status} />
                 </CardContent>
               </Card>
             ))}
