@@ -4,6 +4,7 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { MatchType, Prisma, Trainee } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AuditService } from '../../common/audit/audit.service';
@@ -16,18 +17,19 @@ import { RunMatchDto } from './dto/run-match.dto';
 @Injectable()
 export class TraineesService {
   private readonly logger = new Logger(TraineesService.name);
+  private readonly weights: { aadhaar: number; phone: number; nameDistrict: number };
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
-  ) {}
-
-  /** Rule-based identity matching config. M4's algorithm can plug in here. */
-  private readonly weights = {
-    aadhaar: 95,
-    phone: 80,
-    nameDistrict: 65,
-  };
+    private readonly config: ConfigService,
+  ) {
+    this.weights = {
+      aadhaar: this.config.get<number>('MATCH_WEIGHT_AADHAAR', 95),
+      phone: this.config.get<number>('MATCH_WEIGHT_PHONE', 80),
+      nameDistrict: this.config.get<number>('MATCH_WEIGHT_NAME_DISTRICT', 65),
+    };
+  }
 
   async create(
     dto: CreateTraineeDto,
@@ -146,6 +148,10 @@ export class TraineesService {
     });
 
     this.logger.log(`Contact updated for trainee ${id}`);
+
+    // Re-run identity matching after contact change to prevent ghost profiles
+    await this.matchOne(updated);
+
     return updated;
   }
 
@@ -190,7 +196,7 @@ export class TraineesService {
   async runMatch(dto: RunMatchDto, actor: AuthenticatedUser) {
     const where: Prisma.TraineeWhereInput = dto.trainee_id
       ? { id: dto.trainee_id }
-      : { identity_status: 'canonical' };
+      : { identity_status: { in: ['canonical', 'duplicate'] } };
 
     const trainees = await this.prisma.trainee.findMany({ where });
     let created = 0;
@@ -384,8 +390,9 @@ export class TraineesService {
 
   private assertOwnerOrAdmin(id: string, requester: AuthenticatedUser) {
     const isAdmin = requester.role === 'admin';
+    const isProvider = requester.role === 'provider';
     const isOwner = requester.role === 'trainee' && requester.traineeId === id;
-    if (!isAdmin && !isOwner) {
+    if (!isAdmin && !isProvider && !isOwner) {
       throw new ForbiddenException(
         'You can only access your own trainee profile',
       );

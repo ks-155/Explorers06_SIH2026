@@ -5,12 +5,17 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
+import { Cron, CronExpression } from '@nestjs/schedule';
 import { FollowUpStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AuditService } from '../../common/audit/audit.service';
 import { AuthenticatedUser } from '../../common/decorators/current-user.decorator';
 import { ScheduleFollowUpDto } from './dto/schedule-followup.dto';
 import { RespondFollowUpDto } from './dto/respond-followup.dto';
+
+const FOLLOW_UP_INTERVALS = [30, 90, 180, 365, 730]; // days: 30d, 3m, 6m, 12m, 24m
+const MAX_RETRY_ATTEMPTS = 3;
+const RETRY_CHANNEL_ORDER: string[] = ['whatsapp', 'sms', 'phone'];
 
 @Injectable()
 export class FollowUpsService {
@@ -144,6 +149,133 @@ export class FollowUpsService {
       },
       orderBy: { follow_up_date: 'asc' },
     });
+  }
+
+  /** Auto-scheduler: runs hourly, creates follow-ups at 30d/3m/6m/12m/24m after certification. */
+  @Cron(CronExpression.EVERY_HOUR)
+  async handleAutoSchedule() {
+    this.logger.log('Running auto-schedule for follow-ups');
+
+    for (const days of FOLLOW_UP_INTERVALS) {
+      const targetDate = new Date();
+      targetDate.setDate(targetDate.getDate() - days);
+
+      // Find trainees whose certification_date matches the target interval
+      const trainees = await this.prisma.trainee.findMany({
+        where: {
+          consent_given: true,
+          identity_status: 'canonical',
+        },
+        include: {
+          training_records: {
+            where: {
+              certification_date: {
+                lte: targetDate,
+              },
+              status: 'completed',
+            },
+            orderBy: { certification_date: 'desc' },
+            take: 1,
+          },
+        },
+      });
+
+      for (const trainee of trainees) {
+        if (trainee.training_records.length === 0) continue;
+        const certDate = trainee.training_records[0].certification_date;
+        if (!certDate) continue;
+
+        const dueDate = new Date(certDate);
+        dueDate.setDate(dueDate.getDate() + days);
+
+        // Skip if already past due
+        if (dueDate > new Date()) continue;
+
+        // Check if a follow-up for this interval already exists
+        const existing = await this.prisma.followUp.findFirst({
+          where: {
+            trainee_id: trainee.id,
+            months_after_training: days,
+          },
+        });
+
+        if (existing) continue;
+
+        await this.prisma.followUp.create({
+          data: {
+            trainee_id: trainee.id,
+            months_after_training: days,
+            channel: trainee.preferred_channel as any,
+            follow_up_date: dueDate,
+            status: FollowUpStatus.scheduled,
+            questions: Prisma.JsonNull,
+            responses: Prisma.JsonNull,
+            attempts: 0,
+            channel_attempts: Prisma.JsonNull,
+            next_retry_at: null,
+          },
+        });
+
+        this.logger.log(
+          `Auto-scheduled follow-up: trainee=${trainee.id}, interval=${days}d`,
+        );
+      }
+    }
+  }
+
+  /** Retry handler: escalates channel on failure (whatsapp -> sms -> phone -> unreachable). */
+  async markFailed(id: string, requester: AuthenticatedUser) {
+    const followUp = await this.getFollowUpOrThrow(id);
+    this.assertAdminOrProvider(requester);
+
+    const attempts = (followUp.attempts || 0) + 1;
+    const channelAttempts: Record<string, boolean> =
+      (followUp.channel_attempts as Record<string, boolean>) ?? {};
+
+    // Mark current channel as failed
+    channelAttempts[followUp.channel] = true;
+
+    // Find next channel to try
+    const currentIdx = RETRY_CHANNEL_ORDER.indexOf(followUp.channel);
+    const nextChannel =
+      currentIdx >= 0 && currentIdx < RETRY_CHANNEL_ORDER.length - 1
+        ? RETRY_CHANNEL_ORDER[currentIdx + 1]
+        : null;
+
+    const nextStatus =
+      attempts >= MAX_RETRY_ATTEMPTS || !nextChannel
+        ? FollowUpStatus.failed
+        : FollowUpStatus.scheduled;
+
+    const nextRetryAt =
+      nextStatus === FollowUpStatus.scheduled
+        ? new Date(Date.now() + 24 * 60 * 60 * 1000) // retry in 24h
+        : null;
+
+    const updated = await this.prisma.followUp.update({
+      where: { id },
+      data: {
+        status: nextStatus,
+        attempts,
+        channel_attempts: channelAttempts as Prisma.InputJsonValue,
+        channel: (nextChannel ?? followUp.channel) as any,
+        next_retry_at: nextRetryAt,
+      },
+    });
+
+    await this.audit.record({
+      actor: requester,
+      action: 'followup.retry',
+      entityType: 'follow_up',
+      entityId: id,
+      oldValue: { attempts: followUp.attempts, channel: followUp.channel },
+      newValue: { attempts, channel: nextChannel ?? 'exhausted', status: nextStatus },
+    });
+
+    this.logger.log(
+      `Follow-up ${id}: attempt ${attempts}, next channel=${nextChannel ?? 'none'}, status=${nextStatus}`,
+    );
+    return updated;
   }
 
   private async getFollowUpOrThrow(id: string) {

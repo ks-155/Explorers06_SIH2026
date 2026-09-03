@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, Param, Post } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Role } from '@prisma/client';
 import { Roles } from '../../auth/decorators/roles.decorator';
@@ -25,6 +25,7 @@ export class FollowUpsController {
   }
 
   @Get('pending')
+  @Roles(Role.trainee, Role.admin, Role.provider)
   @ApiOperation({ summary: 'Pending follow-ups for the logged-in trainee' })
   pending(@CurrentUser() actor: AuthenticatedUser) {
     const traineeId = actor.traineeId;
@@ -50,5 +51,13 @@ export class FollowUpsController {
   @ApiOperation({ summary: 'List follow-ups where all channels failed' })
   unreachable(@CurrentUser() actor: AuthenticatedUser) {
     return this.followUpsService.unreachable(actor);
+  }
+
+  @Post(':id/mark-failed')
+  @Roles(Role.admin, Role.provider)
+  @HttpCode(200)
+  @ApiOperation({ summary: 'Mark follow-up as failed and escalate channel' })
+  markFailed(@Param('id') id: string, @CurrentUser() actor: AuthenticatedUser) {
+    return this.followUpsService.markFailed(id, actor);
   }
 }
