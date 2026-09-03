@@ -1,6 +1,8 @@
 version: "3.9"
 
-# SOIS — Local development stack (owned by Arch/M6, schema by Member 5)
+# SOIS — Full-stack local / demo stack
+# Owned by: Member 6 (Architecture & Research) — M6-01/02
+# 5 services: postgres + redis + backend + fe-trainee + fe-admin
 services:
   postgres:
     image: postgres:16
@@ -49,10 +51,47 @@ services:
       DATABASE_URL: postgresql://sois:sois@postgres:5432/sois?schema=public
       REDIS_URL: redis://redis:6379
       PORT: 3001
-      JWT_SECRET: change-me-in-production
+      JWT_SECRET: change-me-to-a-long-random-string-at-least-32-chars
+      CORS_ALLOWED_ORIGINS: http://localhost:3000,http://localhost:3002
+      THROTTLE_TTL: 60000
+      THROTTLE_LIMIT: 30
     ports:
       - "3001:3001"
-    command: npm run start:dev
+    # M6-02: prod entrypoint — migrate deploy + seed + start:prod (was npm run start:dev)
+    command: sh -c "npx prisma migrate deploy && npx prisma db seed || true && npm run start:prod"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3001/api/v1/health | grep -q '\"status\":\"ok\"' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  fe-trainee:
+    build:
+      context: ./frontend-trainee
+      dockerfile: Dockerfile
+    container_name: sois-fe-trainee
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:3001
+    ports:
+      - "3000:3000"
+
+  fe-admin:
+    build:
+      context: ./frontend-admin
+      dockerfile: Dockerfile
+    container_name: sois-fe-admin
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:3001
+    ports:
+      - "3002:3002"
 
 volumes:
   postgres_data:
