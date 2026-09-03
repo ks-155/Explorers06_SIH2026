@@ -224,7 +224,17 @@ export class FollowUpsService {
     });
   }
 
-  /** Auto-scheduler: runs hourly, creates follow-ups at 30d/3m/6m/12m/24m after certification. */
+  /**
+   * Auto-scheduler: runs hourly, creates follow-ups at 30d/3m/6m/12m/24m after
+   * certification.
+   *
+   * MVP note (ARCHITECTURE.md:51 — Data flow: "in-memory cron queue"):
+   * This @Cron (in-memory @nestjs/schedule) satisfies the MVP. For production
+   * at scale, replace with a Redis-backed Bull/BullMQ queue (already available
+   * via docker-compose.yml:redis) — persistent, distributed, and survives
+   * restarts. The service API stays identical; only the trigger moves from
+   * @Cron to @Process/@Processor.
+   */
   @Cron(CronExpression.EVERY_HOUR)
   async handleAutoSchedule() {
     this.logger.log('Running auto-schedule for follow-ups');

@@ -16,6 +16,7 @@ import { EmployersModule } from './modules/employers/employers.module';
 import { TraineesModule } from './modules/trainees/trainees.module';
 import { IdentityMatchesModule } from './modules/identity-matches/identity-matches.module';
 import { FollowUpsModule } from './modules/follow-ups/follow-ups.module';
+import { AnalyticsModule } from './modules/analytics/analytics.module';
 import { SkillGapsModule } from './modules/skill-gaps/skill-gaps.module';
 import { AdaptersModule } from './modules/adapters/adapters.module';
 import { AuditModule } from './common/audit/audit.module';
@@ -40,6 +41,7 @@ import { AuditModule } from './common/audit/audit.module';
     TraineesModule,
     IdentityMatchesModule,
     FollowUpsModule,
+    AnalyticsModule,
     SkillGapsModule,
     EmploymentModule,
     VerificationModule,

@@ -4,53 +4,17 @@ import { Role } from '@prisma/client';
 import { Roles } from '../../auth/decorators/roles.decorator';
 import { SkillGapsService } from './skill-gaps.service';
 
-@ApiTags('Analytics')
+// Skill-gaps is M6 per ARCHITECTURE.md:73 (gap detection).
+// Analytics KPIs (dashboard/retention/wage/provider/district/course) now live
+// in AnalyticsModule (analytics.controller.ts + analytics.service.ts). Keeping
+// this controller at @Controller('analytics') would collide with AnalyticsController,
+// so skill-gaps now serves only GET /analytics/skill-gaps.
+
+@ApiTags('SkillGaps')
 @ApiBearerAuth()
 @Controller('analytics')
 export class SkillGapsController {
   constructor(private readonly skillGapsService: SkillGapsService) {}
-
-  @Get('dashboard')
-  @Roles(Role.admin, Role.government)
-  @ApiOperation({ summary: 'Dashboard KPIs: totals, retention, avg salary' })
-  dashboard() {
-    return this.skillGapsService.dashboard();
-  }
-
-  @Get('retention')
-  @Roles(Role.admin, Role.government)
-  @ApiOperation({ summary: 'Retention rates at 3m/6m/12m/24m' })
-  retention() {
-    return this.skillGapsService.getRetention(90);
-  }
-
-  @Get('wage-progression')
-  @Roles(Role.admin, Role.government)
-  @ApiOperation({ summary: 'Wage progression by months-after-training' })
-  wageProgression() {
-    return this.skillGapsService.wageProgression();
-  }
-
-  @Get('provider-ranking')
-  @Roles(Role.admin, Role.government)
-  @ApiOperation({ summary: 'Top providers by placement rate' })
-  providerRanking() {
-    return this.skillGapsService.providerRanking();
-  }
-
-  @Get('district')
-  @Roles(Role.admin, Role.government)
-  @ApiOperation({ summary: 'Analytics by district' })
-  district() {
-    return this.skillGapsService.districtAnalytics();
-  }
-
-  @Get('course')
-  @Roles(Role.admin, Role.government)
-  @ApiOperation({ summary: 'Analytics by course/sector' })
-  course() {
-    return this.skillGapsService.courseAnalytics();
-  }
 
   @Get('skill-gaps')
   @Roles(Role.admin, Role.government)

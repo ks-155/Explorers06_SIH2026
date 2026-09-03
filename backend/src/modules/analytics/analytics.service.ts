@@ -2,22 +2,10 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 
 @Injectable()
-export class SkillGapsService {
+export class AnalyticsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async findAll() {
-    return this.prisma.skillGap.findMany({
-      orderBy: { created_at: 'desc' },
-    });
-  }
-
-  // Analytics (dashboard/retention/wage/provider/district/course) has moved to
-  // AnalyticsModule (ARCHITECTURE.md:73). SkillGapsService now owns only gap
-  // records; the analytics methods are kept as @deprecated shims delegating to
-  // AnalyticsService for backward compatibility until callers migrate.
-  // TODO: remove these shims once all callers use AnalyticsService.
-
-  /** @deprecated — use AnalyticsService.dashboard() */
+  /** Dashboard KPIs: total trainees, placements, retention, avg wage. */
   async dashboard() {
     const [totalTrainees, totalPlacements, verifiedPlacements, avgSalary] =
       await Promise.all([
