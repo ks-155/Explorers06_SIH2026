@@ -152,7 +152,7 @@ export class SkillGapsService {
         COUNT(*) AS total_trainees,
         COUNT(e.id) AS placements
       FROM trainees t
-      LEFT JOIN employment_records e ON e.trainee_id = t.id AND e.leaving_date ISNULL
+      LEFT JOIN employment_records e ON e.trainee_id = t.id AND e.leaving_date IS NULL
       WHERE t.consent_given = true AND t.district_id IS NOT NULL
       GROUP BY t.district_id
       ORDER BY total_trainees DESC
