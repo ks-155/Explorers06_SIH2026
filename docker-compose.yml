@@ -78,6 +78,11 @@ services:
       NEXT_PUBLIC_API_URL: http://localhost:3001
     ports:
       - "3000:3000"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3000/api/v1/health || wget -qO- http://localhost:3000/ || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
 
   fe-admin:
     build:
@@ -92,6 +97,11 @@ services:
       NEXT_PUBLIC_API_URL: http://localhost:3001
     ports:
       - "3002:3002"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3002/api/v1/health || wget -qO- http://localhost:3002/ || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
 
 volumes:
   postgres_data:
