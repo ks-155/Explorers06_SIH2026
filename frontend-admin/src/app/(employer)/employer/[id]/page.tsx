@@ -1,22 +1,49 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { loadAuth } from '@/lib/auth';
 import { canViewEmployerPortal } from '@/lib/rbac';
 import { Card, CardHeader, CardContent } from '@/components/ui/card';
 import { VerifyCard, type VerifyEmploymentReq } from '@/components/employer/VerifyCard';
+import { ConfidenceBadge } from '@/components/employer/ConfidenceBadge';
 import { mockPending } from '@/mocks/employerMock';
-import { getVerifyPending, postVerifyEmployment } from '@/lib/api';
+import { addEvidence, getVerifyPending, postVerifyEmployment, type AddEvidenceResponse, type EvidenceType } from '@/lib/api';
 
-type RespondedItem = { employment_id: string; trainee_name: string; decision: string; time: string };
+type RespondedItem = { employment_id: string; trainee_name: string; decision: string; time: string; score?: number; level?: string };
+
+// Phase 4 (M2): per-candidate evidence checklist — weights per API-CONTRACT.md:185-190
+type EvidenceKey = Extract<EvidenceType, 'salary_slip' | 'offer_letter' | 'bank_statement'>;
+const EVIDENCE_OPTIONS: { key: EvidenceKey; label: string; points: number }[] = [
+  { key: 'salary_slip', label: 'Salary slip', points: 15 },
+  { key: 'offer_letter', label: 'Offer letter', points: 10 },
+  { key: 'bank_statement', label: 'Bank statement', points: 10 },
+];
+
+function extractScoreLevel(data: unknown): { score?: number; level?: string } {
+  if (!data || typeof data !== 'object') return {};
+  const d = data as Record<string, unknown>;
+  if (typeof d.confidence_score === 'number') {
+    return { score: d.confidence_score, level: typeof d.level === 'string' ? d.level : undefined };
+  }
+  const emp = d.employment;
+  if (emp && typeof emp === 'object') {
+    const e = emp as Record<string, unknown>;
+    if (typeof e.confidence_score === 'number') {
+      return { score: e.confidence_score, level: typeof e.level === 'string' ? e.level : undefined };
+    }
+  }
+  return {};
+}
 
 function EmployerDashboardInner({ params }: { params: { id: string } }) {
   const id = params.id;
   const router = useRouter();
   const qc = useQueryClient();
   const [responded, setResponded] = useState<RespondedItem[]>([]);
-  const [toast, setToast] = useState<string | null>(null);
+  const [toast, setToast] = useState<ReactNode>(null);
+  const [evidenceSel, setEvidenceSel] = useState<Record<string, Record<EvidenceKey, boolean>>>({});
+  const [evidenceBusy, setEvidenceBusy] = useState<string | null>(null);
   const [filter, setFilter] = useState<'pending' | 'verified'>('pending');
   const [lastElapsed, setLastElapsed] = useState<string | null>(null);
   const [auth, setAuth] = useState<{ token: string; role: string } | null>(null);
@@ -54,12 +81,21 @@ function EmployerDashboardInner({ params }: { params: { id: string } }) {
 
   const verifyMut = useMutation({
     mutationFn: (req: VerifyEmploymentReq) => postVerifyEmployment(id, token!, req),
-    onSuccess: (_, req) => {
+    onSuccess: (data, req) => {
       // optimistic: remove from pending cache
       qc.invalidateQueries({ queryKey: ['pending', id] });
       const item = effectivePending.find((x) => x.employment_id === req.employment_id);
-      if (item) setResponded((r) => [...r, { employment_id: item.employment_id, trainee_name: item.trainee_name, decision: req.decision, time: lastElapsed ?? '0.3s' }]);
-      setToast(`✓ ${req.decision === 'confirm' ? 'Confirmed' : 'Denied'} ${item?.trainee_name ?? req.employment_id} — still_employed=${req.still_employed}, job_relevant=${req.job_relevant}`);
+      const { score, level } = extractScoreLevel(data);
+      if (item) setResponded((r) => [...r, { employment_id: item.employment_id, trainee_name: item.trainee_name, decision: req.decision, time: lastElapsed ?? '0.3s', score, level }]);
+      setToast(
+        score != null ? (
+          <span className="inline-flex items-center gap-2">
+            ✓ {req.decision === 'confirm' ? 'Confirmed' : 'Denied'} {item?.trainee_name ?? req.employment_id} — still_employed={String(req.still_employed)}, job_relevant={String(req.job_relevant)} · confidence {score}%{level ? ` (${level})` : ''} <ConfidenceBadge score={score} />
+          </span>
+        ) : (
+          `✓ ${req.decision === 'confirm' ? 'Confirmed' : 'Denied'} ${item?.trainee_name ?? req.employment_id} — still_employed=${req.still_employed}, job_relevant=${req.job_relevant}`
+        ),
+      );
       setTimeout(() => setToast(null), 4000);
     },
     onError: (e: unknown) => {
@@ -83,6 +119,56 @@ function EmployerDashboardInner({ params }: { params: { id: string } }) {
       // mutate local state via refetch simulation: we can't mutate query cache easily for mock, just show toast
       if (item) setResponded((r) => [...r, { employment_id: item.employment_id, trainee_name: item.trainee_name, decision: req.decision, time: `${elapsed}s` }]);
       setToast(`✓ ${req.decision === 'confirm' ? 'Confirmed' : 'Denied'} ${item?.trainee_name} in ${elapsed}s (mock fallback — wiring live in Phase 4)`);
+      setTimeout(() => setToast(null), 4000);
+    }
+  }
+
+  function toggleEvidence(employmentId: string, key: EvidenceKey) {
+    setEvidenceSel((prev) => {
+      const cur = prev[employmentId] ?? { salary_slip: false, offer_letter: false, bank_statement: false };
+      return { ...prev, [employmentId]: { ...cur, [key]: !cur[key] } };
+    });
+  }
+
+  async function onAttachEvidence(employmentId: string) {
+    const sel = evidenceSel[employmentId];
+    const checked = EVIDENCE_OPTIONS.filter((o) => sel?.[o.key]);
+    if (checked.length === 0) {
+      setToast('Select at least one evidence type first.');
+      setTimeout(() => setToast(null), 4000);
+      return;
+    }
+    // Mock fallback when backend unreachable — keeps demo alive, mirrors onVerify pattern
+    if (!token || error) {
+      await new Promise((r) => setTimeout(r, 200));
+      const bonus = checked.reduce((s, o) => s + o.points, 0);
+      setToast(`✓ Evidence attached (mock fallback): ${checked.map((c) => c.label).join(', ')} (~+${bonus} pts) for ${employmentId}`);
+      setTimeout(() => setToast(null), 4000);
+      return;
+    }
+    setEvidenceBusy(employmentId);
+    try {
+      let last: AddEvidenceResponse | null = null;
+      for (const opt of checked) {
+        last = await addEvidence(employmentId, token, { evidence_type: opt.key });
+      }
+      qc.invalidateQueries({ queryKey: ['pending', id] });
+      const score = last?.employment?.confidence_score;
+      const level = last?.employment?.level;
+      setToast(
+        score != null ? (
+          <span className="inline-flex items-center gap-2">
+            ✓ Evidence attached ({checked.map((c) => c.label).join(', ')}) — confidence {score}%{level ? ` (${level})` : ''} <ConfidenceBadge score={score} />
+          </span>
+        ) : (
+          `✓ Evidence attached (${checked.map((c) => c.label).join(', ')}) for ${employmentId}`
+        ),
+      );
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      setToast(`✗ Evidence attach failed: ${msg}`);
+    } finally {
+      setEvidenceBusy(null);
       setTimeout(() => setToast(null), 4000);
     }
   }
@@ -141,7 +227,30 @@ function EmployerDashboardInner({ params }: { params: { id: string } }) {
             {effectivePending.length === 0 ? (
               <p className="text-sm text-gray-500">All caught up — no pending verifications.</p>
             ) : (
-              effectivePending.map((item) => <VerifyCard key={item.employment_id} item={item} onVerify={onVerify} />)
+              effectivePending.map((item) => (
+                <div key={item.employment_id} className="space-y-2 border-b pb-3 last:border-0">
+                  <VerifyCard item={item} onVerify={onVerify} />
+                  <div className="flex flex-wrap items-center gap-3 text-xs bg-gray-50 border rounded px-3 py-2">
+                    {EVIDENCE_OPTIONS.map((o) => (
+                      <label key={o.key} className="flex items-center gap-1">
+                        <input
+                          type="checkbox"
+                          checked={evidenceSel[item.employment_id]?.[o.key] ?? false}
+                          onChange={() => toggleEvidence(item.employment_id, o.key)}
+                        />
+                        {o.label} +{o.points}
+                      </label>
+                    ))}
+                    <button
+                      onClick={() => onAttachEvidence(item.employment_id)}
+                      disabled={evidenceBusy === item.employment_id}
+                      className="ml-auto px-3 py-1 rounded bg-teal-700 text-white disabled:opacity-50"
+                    >
+                      {evidenceBusy === item.employment_id ? 'Attaching…' : 'Attach evidence'}
+                    </button>
+                  </div>
+                </div>
+              ))
             )}
             <p className="text-xs text-gray-400">Live POST /api/v1/employers/:id/verify-employment employment_id, decision, still_employed, job_relevant per API-CONTRACT.md:204. Mock fallback keeps demo when backend offline.</p>
           </CardContent>
@@ -158,6 +267,7 @@ function EmployerDashboardInner({ params }: { params: { id: string } }) {
                   <tr className="text-left text-gray-500">
                     <th>Trainee</th>
                     <th>Decision</th>
+                    <th>Confidence</th>
                     <th>Time</th>
                   </tr>
                 </thead>
@@ -166,6 +276,16 @@ function EmployerDashboardInner({ params }: { params: { id: string } }) {
                     <tr key={r.employment_id} className="border-t">
                       <td className="py-1">{r.trainee_name}</td>
                       <td className={`py-1 ${r.decision === 'confirm' ? 'text-green-700' : 'text-red-700'}`}>{r.decision}</td>
+                      <td className="py-1">
+                        {r.score != null ? (
+                          <span className="inline-flex items-center gap-1">
+                            <ConfidenceBadge score={r.score} />
+                            {r.level && <span className="text-xs text-gray-500">{r.level}</span>}
+                          </span>
+                        ) : (
+                          <span className="text-xs text-gray-400">—</span>
+                        )}
+                      </td>
                       <td className="py-1">{r.time}</td>
                     </tr>
                   ))}

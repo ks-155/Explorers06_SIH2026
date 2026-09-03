@@ -87,3 +87,15 @@ export async function getSkillGaps(token: string): Promise<SkillGap[]> {
   const res = await authFetch('/analytics/skill-gaps', token);
   return handleJson(res);
 }
+
+// --- Phase 4 (M2): attach verification evidence per API-CONTRACT.md:154 ---
+// POST /employment/:id/evidence — weights: salary_slip +15, bank_statement +10,
+// offer_letter +10, udyam +5, EPFO +20 (cap 100); levels 80-100 HIGH | 50-79 MEDIUM | 20-49 LOW | 0-19 UNVERIFIED
+export type EvidenceType = 'salary_slip' | 'bank_statement' | 'offer_letter' | 'udyam_link' | 'epfo_check';
+export type AddEvidenceBody = { evidence_type: EvidenceType; evidence_data?: Record<string, unknown> };
+export type AddEvidenceResponse = { employment: { confidence_score: number; level?: string }; breakdown?: unknown };
+
+export async function addEvidence(employmentId: string, token: string, body: AddEvidenceBody): Promise<AddEvidenceResponse> {
+  const res = await authFetch(`/employment/${employmentId}/evidence`, token, { method: 'POST', body: JSON.stringify(body) });
+  return handleJson<AddEvidenceResponse>(res);
+}
