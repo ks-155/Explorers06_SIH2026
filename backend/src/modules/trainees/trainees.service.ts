@@ -1,11 +1,13 @@
 import {
+  BadRequestException,
   ForbiddenException,
   Injectable,
   Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { MatchType, Prisma, Trainee } from '@prisma/client';
+import { MatchType, Prisma, Role, Trainee } from '@prisma/client';
+import { AuthService } from '../../auth/auth.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AuditService } from '../../common/audit/audit.service';
 import { AuthenticatedUser } from '../../common/decorators/current-user.decorator';
@@ -27,6 +29,7 @@ export class TraineesService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly config: ConfigService,
+    private readonly auth: AuthService,
   ) {
     this.weights = {
       aadhaar: this.config.get<number>('MATCH_WEIGHT_AADHAAR', 95),
@@ -67,6 +70,46 @@ export class TraineesService {
     });
 
     this.logger.log(`Trainee registered: ${trainee.id} (${trainee.phone})`);
+
+    if (dto.password) {
+      if (dto.password.length < 8) {
+        throw new BadRequestException('Password must be at least 8 characters');
+      }
+      const password_hash = await this.auth.hashPassword(dto.password);
+      try {
+        const user = await this.prisma.user.create({
+          data: {
+            role: Role.trainee,
+            phone: dto.phone,
+            email: dto.email || null,
+            password_hash,
+            trainee_id: trainee.id,
+          },
+        });
+        const tokens = await this.auth.issueTokens({
+          id: user.id,
+          role: user.role,
+          traineeId: trainee.id,
+          employerId: null,
+        });
+        return {
+          ...trainee,
+          accessToken: tokens.accessToken,
+          refreshToken: tokens.refreshToken,
+          role: user.role,
+          userId: user.id,
+          traineeId: trainee.id,
+        };
+      } catch (err) {
+        this.logger.warn(
+          `Trainee ${trainee.id} created but login account failed: ${(err as Error).message}`,
+        );
+        throw new BadRequestException(
+          'Profile created, but this phone or email already has a login. Sign in instead.',
+        );
+      }
+    }
+
     return trainee;
   }
 
@@ -377,10 +420,11 @@ export class TraineesService {
 
   private sanitized(dto: CreateTraineeDto): Record<string, unknown> {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { aadhaar_hash, ...rest } = dto;
+    const { aadhaar_hash, password, ...rest } = dto;
     return {
       ...rest,
       aadhaar_hash_stored: Boolean(dto.aadhaar_hash),
+      password_set: Boolean(password),
     };
   }
 

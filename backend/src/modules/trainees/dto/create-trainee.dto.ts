@@ -74,4 +74,13 @@ export class CreateTraineeDto {
   @IsOptional()
   @MaxLength(20)
   preferred_channel?: string;
+
+  @ApiPropertyOptional({
+    description:
+      'Password for the trainee login account (min 8). When set, a User is created and JWTs are returned.',
+  })
+  @IsString()
+  @IsOptional()
+  @MaxLength(72)
+  password?: string;
 }

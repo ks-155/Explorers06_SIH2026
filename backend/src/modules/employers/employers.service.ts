@@ -5,6 +5,7 @@ import {
   BadRequestException,
   Logger,
 } from '@nestjs/common';
+import { VerificationStatus } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import {
   AuditService,
@@ -13,6 +14,12 @@ import {
 import { ConfidenceScoreService } from '../verification/confidence-score.service';
 import { CreateEmployerDto } from './dto/create-employer.dto';
 import { VerifyEmploymentDto } from './dto/verify-employer.dto';
+import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator';
+
+const OPEN_VERIFY_STATUSES: VerificationStatus[] = [
+  VerificationStatus.pending,
+  VerificationStatus.self_reported,
+];
 
 @Injectable()
 export class EmployersService {
@@ -23,6 +30,23 @@ export class EmployersService {
     private readonly confidenceScore: ConfidenceScoreService,
     private readonly audit: AuditService,
   ) {}
+
+  resolveEmployerId(id: string, actor?: AuthenticatedUser): string {
+    if (id === 'me') {
+      if (!actor?.employerId) {
+        throw new BadRequestException(
+          'This account is not linked to an employer organisation',
+        );
+      }
+      return actor.employerId;
+    }
+    if (actor?.role === 'employer' && actor.employerId && actor.employerId !== id) {
+      throw new ForbiddenException(
+        'You can only access your own employer organisation',
+      );
+    }
+    return id;
+  }
 
   async create(dto: CreateEmployerDto, actor?: { id: string; role: string }) {
     const employer = await this.prisma.employer.create({
@@ -51,15 +75,16 @@ export class EmployersService {
     return employer;
   }
 
-  async findById(id: string, actor?: { role?: string; employerId?: string }) {
-    if (actor?.role === 'employer' && actor.employerId !== id) {
+  async findById(id: string, actor?: AuthenticatedUser) {
+    const employerId = this.resolveEmployerId(id, actor);
+    if (actor?.role === 'employer' && actor.employerId !== employerId) {
       throw new ForbiddenException(
         'You can only view your own employer profile',
       );
     }
 
     const employer = await this.prisma.employer.findUnique({
-      where: { id },
+      where: { id: employerId },
       include: {
         employment_records: {
           select: {
@@ -67,17 +92,21 @@ export class EmployersService {
             job_role: true,
             verification_status: true,
             confidence_score: true,
+            trainee: { select: { name: true } },
+            joining_date: true,
+            employment_type: true,
           },
+          orderBy: { created_at: 'desc' },
         },
       },
     });
 
     if (!employer) {
-      throw new NotFoundException(`Employer ${id} not found`);
+      throw new NotFoundException(`Employer ${employerId} not found`);
     }
 
-    const pendingCount = employer.employment_records.filter(
-      (r) => r.verification_status === 'pending',
+    const pendingCount = employer.employment_records.filter((r) =>
+      OPEN_VERIFY_STATUSES.includes(r.verification_status),
     ).length;
 
     return {
@@ -86,7 +115,8 @@ export class EmployersService {
     };
   }
 
-  async findPendingVerifications(employerId: string) {
+  async findPendingVerifications(employerIdParam: string, actor?: AuthenticatedUser) {
+    const employerId = this.resolveEmployerId(employerIdParam, actor);
     const employer = await this.prisma.employer.findUnique({
       where: { id: employerId },
     });
@@ -98,15 +128,29 @@ export class EmployersService {
     const pending = await this.prisma.employmentRecord.findMany({
       where: {
         employer_id: employerId,
-        verification_status: 'pending',
+        verification_status: { in: OPEN_VERIFY_STATUSES },
       },
       include: {
         trainee: { select: { id: true, name: true, phone: true } },
         training: { select: { id: true, job_role: true, sector: true } },
       },
+      orderBy: { created_at: 'desc' },
     });
 
-    return pending;
+    return pending.map((r) => ({
+      employment_id: r.id,
+      trainee_id: r.trainee?.id,
+      trainee_name: r.trainee?.name ?? 'Unknown trainee',
+      job_role: r.job_role ?? r.training?.job_role ?? '—',
+      training_job_role: r.training?.job_role ?? undefined,
+      confidence_score:
+        r.confidence_score != null ? Number(r.confidence_score) : undefined,
+      joining_date: r.joining_date
+        ? r.joining_date.toISOString().slice(0, 10)
+        : undefined,
+      verification_status: r.verification_status,
+      employment_type: r.employment_type,
+    }));
   }
 
   async verifyEmployment(dto: VerifyEmploymentDto, employerUserId: string) {

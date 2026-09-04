@@ -45,8 +45,8 @@ export class EmployersController {
   @Get(':id/verify-pending')
   @Roles(Role.employer, Role.admin)
   @ApiOperation({ summary: 'Get pending verifications for employer' })
-  findPending(@Param('id') id: string) {
-    return this.employersService.findPendingVerifications(id);
+  findPending(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
+    return this.employersService.findPendingVerifications(id, user);
   }
 
   @Post(':id/verify-employment')
