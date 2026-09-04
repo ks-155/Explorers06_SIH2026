@@ -26,7 +26,6 @@ function ToggleGroup({
   label,
   value,
   onChange,
-  idPrefix,
 }: {
   label: string;
   value: boolean;

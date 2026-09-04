@@ -11,6 +11,8 @@ const nav = [
   { href: '/dashboard/ranking', label: 'Provider Ranking' },
   { href: '/dashboard/district/pune', label: 'District' },
   { href: '/dashboard/skill-gaps', label: 'Skill Gaps' },
+  { href: '/dashboard/funnel', label: 'Outcome Funnel' },
+  { href: '/dashboard/follow-ups', label: 'Follow-up Monitor' },
 ];
 
 export default function GovLayout({ children }: { children: React.ReactNode }) {
@@ -104,7 +106,7 @@ export default function GovLayout({ children }: { children: React.ReactNode }) {
             Sign out
           </button>
         </div>
-        <p className="text-xs text-slate-400 mt-2">Phase 3 gov-ov: RBAC live, mocks until Phase 5 live analytics</p>
+        <p className="text-xs text-slate-400 mt-2">RBAC live · Analytics live</p>
       </aside>
       <section className="flex-1 min-w-0">{children}</section>
     </div>

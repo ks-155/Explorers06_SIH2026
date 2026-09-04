@@ -8,7 +8,7 @@ const DIRECT_BASE =
 const API_BASE = process.env.NEXT_PUBLIC_API_URL
   ? `${process.env.NEXT_PUBLIC_API_URL.replace(/\/$/, "")}/api/v1`
   : "/api/v1";
-// Keep alias for backwards compat if any module imported API_PREFIX
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const API_PREFIX = API_BASE;
 
 // --- Storage helpers (JWT) ---
@@ -177,6 +177,22 @@ export const api = {
     },
     respond(id: string, payload: Record<string, unknown>) {
       return request(`/follow-ups/${id}/respond`, {
+        method: "POST",
+        body: JSON.stringify(payload),
+      });
+    },
+  },
+  employment: {
+    create(payload: {
+      trainee_id: string;
+      training_id?: string;
+      employer_id?: string;
+      job_role: string;
+      employment_type: string;
+      joining_date?: string;
+      current_salary?: number;
+    }) {
+      return request(`/employment`, {
         method: "POST",
         body: JSON.stringify(payload),
       });

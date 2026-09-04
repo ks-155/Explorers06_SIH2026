@@ -67,8 +67,8 @@ export type LoginRequest = { identifier: string; password: string };
 export type LoginResponse = { accessToken: string; refreshToken: string; role: 'trainee' | 'employer' | 'provider' | 'government' | 'admin'; userId: string };
 export type VerifyEmploymentReq = { employment_id: string; decision: 'confirm' | 'deny'; still_employed: boolean; job_relevant: boolean };
 export type PendingItem = { employment_id: string; trainee_name: string; job_role: string; training_job_role?: string; confidence_score?: number; joining_date?: string };
-export type AnalyticsDashboard = { trained: number; certified: number; verified_employed: number; unemployed: number; unreachable: number; retention: Record<string, number>; wage_progression: Record<string, number> };
-export type ProviderRank = { id: string; name: string; placement: number; retention: number; district: string };
+export type AnalyticsDashboard = { trained: number; certified: number; verified_employed: number; unemployed: number; unreachable: number; retention: Record<string, number>; wage_progression: Record<string, number>; avg_monthly_salary: number | null };
+export type ProviderRank = { id: string; name: string; placement: number; retention: number; district_id?: number | null };
 export type SkillGap = { skill_name?: string; skill?: string; gap_type: string; recommendation: string; gap_description?: string };
 
 export async function login(req: LoginRequest): Promise<LoginResponse> {
@@ -113,6 +113,26 @@ export async function getCourseAnalytics(courseId: string, token: string): Promi
 
 export async function getSkillGaps(token: string): Promise<SkillGap[]> {
   const res = await authFetch('/analytics/skill-gaps', token);
+  return handleJson(res);
+}
+
+export async function getFollowUpMonitoring(token: string): Promise<{ status_breakdown: Record<string, number>; non_placement_reasons: { reason: string; count: number }[] }> {
+  const res = await authFetch('/analytics/follow-up-monitoring', token);
+  return handleJson(res);
+}
+
+export async function getOutcomeFunnel(token: string): Promise<{ registered: number; trained: number; certified: number; employed: number; verified_employed: number; active_retained: number }> {
+  const res = await authFetch('/analytics/outcome-funnel', token);
+  return handleJson(res);
+}
+
+export async function getOutcomeBreakdown(token: string): Promise<{ by_type: { type: string; count: number; verified: number }[]; unemployed: number }> {
+  const res = await authFetch('/analytics/outcome-breakdown', token);
+  return handleJson(res);
+}
+
+export async function getCourseAnalyticsAll(token: string): Promise<unknown> {
+  const res = await authFetch('/analytics/course', token);
   return handleJson(res);
 }
 

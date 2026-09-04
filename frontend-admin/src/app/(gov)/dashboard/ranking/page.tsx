@@ -1,13 +1,12 @@
 'use client';
 import { useEffect, useState, useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Card, CardHeader, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { mockProviderRanking } from '@/mocks/govMock';
 import { getProviderRanking } from '@/lib/api';
 import { loadAuth } from '@/lib/auth';
 
-type SortKey = 'name' | 'district' | 'placement' | 'retention';
+type SortKey = 'name' | 'district_id' | 'placement' | 'retention';
 type SortDir = 'asc' | 'desc';
 
 function confidenceColor(score: number): string {
@@ -18,6 +17,7 @@ function confidenceColor(score: number): string {
 
 export default function RankingPage() {
   const [token, setToken] = useState<string | null>(null);
+  const queryClient = useQueryClient();
   useEffect(() => {
     const a = loadAuth();
     if (a) setToken(a.accessToken);
@@ -30,34 +30,34 @@ export default function RankingPage() {
     retry: 1,
     refetchOnWindowFocus: false,
   });
-  const rows = (data as unknown as typeof mockProviderRanking) ?? mockProviderRanking;
-  const isLive = !error && data !== undefined;
+  const rows = useMemo(() => data ?? [], [data]);
   const [sortKey, setSortKey] = useState<SortKey>('placement');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
   const [page, setPage] = useState(1);
   const pageSize = 5;
   const forbidden = (error as Error)?.message?.includes('Forbidden') ? 'Forbidden — analytics requires government/admin' : null;
+  const fetchError = error && !forbidden;
 
   function toggleSort(key: SortKey) {
     if (sortKey === key) {
       setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
     } else {
       setSortKey(key);
-      setSortDir(key === 'name' || key === 'district' ? 'asc' : 'desc');
+      setSortDir(key === 'name' || key === 'district_id' ? 'asc' : 'desc');
     }
     setPage(1);
   }
 
   const sorted = useMemo(() => {
-    const copy = [...rows] as typeof mockProviderRanking;
+    const copy = [...rows];
     copy.sort((a, b) => {
-      const av = (a as Record<string, unknown>)[sortKey] as string | number;
-      const bv = (b as Record<string, unknown>)[sortKey] as string | number;
+      const av = a[sortKey] as string | number | undefined;
+      const bv = b[sortKey] as string | number | undefined;
       if (typeof av === 'string' && typeof bv === 'string') {
         return sortDir === 'asc' ? av.localeCompare(bv) : bv.localeCompare(av);
       }
-      const an = av as number;
-      const bn = bv as number;
+      const an = (av as number) ?? 0;
+      const bn = (bv as number) ?? 0;
       return sortDir === 'asc' ? an - bn : bn - an;
     });
     return copy;
@@ -72,11 +72,18 @@ export default function RankingPage() {
 
   return (
     <main className="space-y-4 animate-page-enter">
-      <h1 className="text-xl font-bold text-slate-900">
-        Provider Ranking {isLive ? <span className="text-[#059669] text-sm font-semibold">Live</span> : <span className="text-[#d97706] text-sm font-semibold">Mock fallback</span>}
-      </h1>
-      <p className="text-sm text-slate-500">GET /api/v1/analytics/provider-ranking (gov/admin only) {isLoading ? '' : ''} {error ? (forbidden ? forbidden : 'mock fallback') : ''}</p>
+      <h1 className="text-xl font-bold text-slate-900">Provider Ranking</h1>
+      <p className="text-sm text-slate-500">GET /api/v1/analytics/provider-ranking (gov/admin only)</p>
       {forbidden && <div className="bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-lg text-sm shadow-sm">{forbidden}</div>}
+      {fetchError && !isLoading && (
+        <div className="bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-lg text-sm shadow-sm flex items-center justify-between">
+          <span>Failed to load provider data</span>
+          <button onClick={() => queryClient.invalidateQueries({ queryKey: ['provider-ranking'] })} className="min-h-[32px] px-3 py-1 rounded-lg bg-slate-900 text-white text-xs font-semibold shadow-sm hover:bg-slate-800">Retry</button>
+        </div>
+      )}
+      {!isLoading && !error && rows.length === 0 && (
+        <div className="bg-slate-50 border border-slate-200 text-slate-600 px-4 py-8 rounded-lg text-sm shadow-sm text-center">No provider data available</div>
+      )}
       <Card className="rounded-lg shadow-sm border-slate-200 overflow-hidden transition-all duration-200 hover:shadow-md">
         <CardHeader className="font-semibold text-slate-900 bg-slate-50 border-b border-slate-200 flex flex-wrap justify-between items-center gap-2">
           <span>Providers — sortable table · sticky headers · pagination</span>
@@ -101,8 +108,8 @@ export default function RankingPage() {
                     <th className="px-4 py-2.5 font-semibold cursor-pointer select-none hover:text-slate-900 transition-colors" onClick={() => toggleSort('name')}>
                       Name <SortIcon active={sortKey === 'name'} dir={sortDir} />
                     </th>
-                    <th className="px-4 py-2.5 font-semibold cursor-pointer select-none hover:text-slate-900 transition-colors" onClick={() => toggleSort('district')}>
-                      District <SortIcon active={sortKey === 'district'} dir={sortDir} />
+                    <th className="px-4 py-2.5 font-semibold cursor-pointer select-none hover:text-slate-900 transition-colors" onClick={() => toggleSort('district_id')}>
+                      District <SortIcon active={sortKey === 'district_id'} dir={sortDir} />
                     </th>
                     <th className="px-4 py-2.5 font-semibold cursor-pointer select-none hover:text-slate-900 transition-colors" onClick={() => toggleSort('placement')}>
                       Placement <SortIcon active={sortKey === 'placement'} dir={sortDir} />
@@ -117,7 +124,7 @@ export default function RankingPage() {
                   {paged.map((p) => (
                     <tr key={p.id} className="border-t border-slate-100 hover:bg-slate-50/60 transition-colors">
                       <td className="px-4 py-2.5 font-medium text-slate-900">{p.name}</td>
-                      <td className="px-4 py-2.5 text-slate-700">{p.district}</td>
+                      <td className="px-4 py-2.5 text-slate-700">{p.district_id ?? '—'}</td>
                       <td className="px-4 py-2.5">
                         <span className="inline-flex items-center gap-1">
                           <span className="font-semibold text-slate-900">{p.placement}%</span>
